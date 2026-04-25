@@ -97,8 +97,9 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(f"USB Fix Tool  v{APP_VERSION}")
-        self.resize(960, 680)
-        self.setMinimumSize(720, 560)   # responsive floor
+        self.resize(960, 720)
+        # Floor that fits 3 visible drive rows + full action card + log
+        self.setMinimumSize(720, 640)
         self._thread: Optional[QThread] = None
         self._worker: Optional[CommandWorker] = None
         self._devices: List[usb_utils.UsbDevice] = []
@@ -123,9 +124,9 @@ class MainWindow(QMainWindow):
 
         root.addWidget(self._build_header())
         root.addWidget(self._build_promo())
-        root.addWidget(self._build_device_section(), stretch=2)
-        root.addWidget(self._build_action_section())
-        root.addWidget(self._build_log_section(), stretch=3)
+        root.addWidget(self._build_device_section(), stretch=2)  # table
+        root.addWidget(self._build_action_section())             # natural
+        root.addWidget(self._build_log_section(), stretch=1)     # log
 
     def _build_header(self) -> QWidget:
         title = QLabel("USB Fix Tool")
@@ -178,6 +179,9 @@ class MainWindow(QMainWindow):
     def _build_device_section(self) -> QWidget:
         wrap = QFrame()
         wrap.setObjectName("card")
+        # Guarantee the table card always has room for header + a few
+        # rows even when the window is squeezed to its minimum.
+        wrap.setMinimumHeight(160)
         v = QVBoxLayout(wrap)
         v.setContentsMargins(14, 12, 14, 14)
 
@@ -212,8 +216,9 @@ class MainWindow(QMainWindow):
         self.table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
+        self.table.horizontalHeader().setStretchLastSection(True)
         self.table.horizontalHeader().setHighlightSections(False)
-        self.table.verticalHeader().setDefaultSectionSize(38)
+        self.table.verticalHeader().setDefaultSectionSize(30)
         # Let the table fill the device card vertically/horizontally
         self.table.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -256,7 +261,10 @@ class MainWindow(QMainWindow):
         self.letter_input = QLineEdit()
         self.letter_input.setPlaceholderText("F")
         self.letter_input.setMaxLength(1)
-        self.letter_input.setFixedWidth(50)
+        # Use min/max width so the field stays narrow without using
+        # setFixedWidth (which fights the parent layout on resize).
+        self.letter_input.setMinimumWidth(44)
+        self.letter_input.setMaximumWidth(64)
         row1.addWidget(self.letter_input)
         outer.addLayout(row1)
 
@@ -302,7 +310,11 @@ class MainWindow(QMainWindow):
         self.progress.setTextVisible(False)
         self.progress.setRange(0, 1)
         self.progress.setValue(0)
-        self.progress.setFixedHeight(8)
+        # Slim 8 px height enforced via QSS (min/max-height) so the
+        # widget still cooperates with parent layouts on resize.
+        self.progress.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
 
         status_row.addWidget(self.status_dot)
         status_row.addWidget(self.status_label)
@@ -618,19 +630,23 @@ class MainWindow(QMainWindow):
         self.table.setRowCount(len(self._devices))
 
         mono = QFont("Consolas", 10)
+        # Per spec: every cell uses left + vertical-centre alignment so
+        # rows never appear pushed downward at any window size.
+        align = int(Qt.AlignmentFlag.AlignLeft
+                    | Qt.AlignmentFlag.AlignVCenter)
+
         for r, dev in enumerate(self._devices):
-            # (text, alignment, mono?)
             cells = [
-                (dev.drive_letter, Qt.AlignmentFlag.AlignCenter, True),
-                (dev.label or "—", Qt.AlignmentFlag.AlignLeft, False),
-                (dev.file_system or "—", Qt.AlignmentFlag.AlignCenter, True),
-                (dev.size_human, Qt.AlignmentFlag.AlignRight, True),
-                (dev.used_human, Qt.AlignmentFlag.AlignRight, True),
-                (dev.free_human, Qt.AlignmentFlag.AlignRight, True),
+                (dev.drive_letter, True),
+                (dev.label or "—", False),
+                (dev.file_system or "—", True),
+                (dev.size_human, True),
+                (dev.used_human, True),
+                (dev.free_human, True),
             ]
-            for c, (val, align, is_mono) in enumerate(cells):
+            for c, (val, is_mono) in enumerate(cells):
                 item = QTableWidgetItem(str(val))
-                item.setTextAlignment(int(align | Qt.AlignmentFlag.AlignVCenter))
+                item.setTextAlignment(align)
                 if is_mono:
                     item.setFont(mono)
                 self.table.setItem(r, c, item)
