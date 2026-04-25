@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>USB Drive Showing 0 Bytes? Fix It in Under 5 Minutes (2026)</title>
+<meta name="description" content="Your USB drive shows 0 bytes capacity in Windows? Find out why it happens and how to fix it with diskpart, CHKDSK or the free USB Fix Tool — without losing data.">
+<meta name="keywords" content="usb 0 bytes fix, usb shows 0 bytes, flash drive 0 bytes, repair usb 0 bytes, usb drive 0 capacity">
+<link rel="canonical" href="https://example.com/blog/usb-0-bytes-fix.html" />
+
+<meta property="og:type" content="article" />
+<meta property="og:title" content="USB Drive Showing 0 Bytes Fix" />
+<meta property="og:description" content="Why a working drive suddenly reports zero capacity, and how to bring it back." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav">
+    <a class="brand" href="../index.html">USB Fix Tool<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../download.html">Download</a>
+      <a href="../blog.html">Blog</a>
+    </nav>
+  </div>
+</header>
+
+<article class="article">
+  <header>
+    <span class="post-meta">Troubleshooting · 8 min read</span>
+    <h1>USB Drive Showing 0 Bytes Fix</h1>
+    <p class="muted">
+      Your 32 GB USB stick suddenly shows up with <strong>0 bytes</strong>
+      of total capacity. Windows can see it, but every double-click
+      gives you <em>"Insert a disk into drive F:"</em>. Annoying — but
+      almost always fixable in five minutes flat.
+    </p>
+  </header>
+
+  <div class="ad-slot" aria-label="Advertisement">
+    Ad slot — 728×90
+    <small>Replace with AdSense unit when ready</small>
+  </div>
+
+  <h2>Why does a USB drive show 0 bytes?</h2>
+
+  <p>There are four common causes:</p>
+
+  <ol>
+    <li><strong>Corrupted partition table.</strong> The drive's "table
+        of contents" got damaged — usually from yanking it out during a
+        write. Windows reads the table, sees nonsense, and reports
+        zero capacity.</li>
+    <li><strong>Counterfeit / fake-capacity drive.</strong> Cheap
+        marketplace sticks lie about their size. Once you fill the
+        real flash, the controller starts returning errors and Windows
+        eventually gives up and reports 0 bytes.</li>
+    <li><strong>Failed firmware update or unsafe ejection during a
+        format.</strong> Mid-operation power loss leaves the controller
+        in a half-erased state.</li>
+    <li><strong>Dying NAND chip.</strong> Less common, but it does
+        happen — especially on sticks older than five years that have
+        seen heavy use.</li>
+  </ol>
+
+  <p>
+    The first three are software problems. You can fix them at home,
+    for free, in under five minutes. The fourth one isn't fixable —
+    but a recovery scan can usually still pull files back.
+  </p>
+
+  <h2>Before you fix it: try to read the drive</h2>
+
+  <p>
+    Even if Windows reports 0 bytes, recovery software can sometimes
+    read the raw flash and pull files back — but only <em>before</em>
+    you run diskpart on it. If you have important data on the stick,
+    run a recovery scan first.
+  </p>
+
+  <div class="affiliate-box">
+    <div>
+      <h3>Recover before you repair</h3>
+      <p>
+        Modern recovery tools scan the drive at the sector level even
+        when Windows reports 0 bytes. Pull your files first, then fix
+        the drive — the success rate drops dramatically once you
+        diskpart-clean.
+      </p>
+    </div>
+    <a class="btn btn-affiliate" href="https://example.com/recover?ref=usbfixtool" target="_blank" rel="nofollow sponsored noopener">
+      Recover lost files →
+    </a>
+  </div>
+
+  <h2>Fix 1 — Try CHKDSK first (rarely works, but cheap)</h2>
+
+  <p>
+    CHKDSK normally refuses to run on a 0-byte drive ("the type of the
+    file system is RAW"), but it's worth a 30-second attempt: every
+    once in a while it spots a damaged FAT and rebuilds it.
+  </p>
+
+  <pre><code>chkdsk F: /F /R /X</code></pre>
+
+  <p>
+    If it bails out with a RAW or unrecognised-format error, move on
+    to Fix 2.
+  </p>
+
+  <h2>Fix 2 — Diskpart clean and recreate (works on most drives)</h2>
+
+  <p>
+    This is the magic bullet for 0-byte USB sticks. Diskpart wipes the
+    partition table, recreates a fresh primary partition spanning the
+    full real capacity of the flash, and formats it.
+  </p>
+
+  <p>
+    <strong>This erases everything on the drive.</strong> Recover your
+    files first if you need them.
+  </p>
+
+  <ol>
+    <li>Open Command Prompt as administrator.</li>
+    <li>Type <code>diskpart</code> and press Enter.</li>
+    <li>Type <code>list disk</code> — find your USB stick by size.
+        Check the size <em>twice</em> — choosing the wrong number
+        wipes another drive on your PC.</li>
+    <li>Run the script below, replacing <code>N</code> with the disk
+        number from the previous step:</li>
+  </ol>
+
+  <pre><code>select disk N
+attributes disk clear readonly
+clean
+create partition primary
+active
+format fs=exfat quick
+assign
+exit</code></pre>
+
+  <p>
+    After <code>exit</code>, Windows pops up a "Drive ready to use"
+    notification. Open File Explorer — the stick now reports its real
+    capacity again.
+  </p>
+
+  <p>
+    USB Fix Tool's <strong>Advanced Repair</strong> button runs exactly
+    this script. The selected drive's disk number is figured out for
+    you, and a confirmation dialog displays the size before anything
+    is erased.
+  </p>
+
+  <h2>Fix 3 — Vendor "low-level format" tools (last resort)</h2>
+
+  <p>
+    If diskpart fails ("DiskPart has encountered an error: Access is
+    denied" or "The media is write protected"), the controller itself
+    is stuck. Manufacturer-specific tools can sometimes reset it:
+  </p>
+
+  <ul>
+    <li><strong>SanDisk</strong> — RescuePRO and Memory Zone (mostly
+        for cards).</li>
+    <li><strong>Kingston</strong> — Format Utility on the Kingston
+        support site.</li>
+    <li><strong>Transcend / ADATA</strong> — vendor-specific format
+        utilities, downloadable from each company's site.</li>
+    <li><strong>Generic chips</strong> — there's a community-driven
+        tool called <em>ChipGenius</em> that identifies the controller
+        and points you to the matching firmware utility.</li>
+  </ul>
+
+  <p>
+    These tools talk directly to the USB controller and reset its
+    internal state — including the read-only flag that diskpart can't
+    clear.
+  </p>
+
+  <h2>Special case — counterfeit drives</h2>
+
+  <p>
+    A "1 TB" stick bought for $9 is almost certainly fake. Vendors
+    flash the controller to <em>report</em> a huge capacity, but the
+    actual NAND inside is 8 GB or 16 GB. The drive looks fine until
+    you fill it past the real size — then it overwrites the start of
+    its own data, the partition table breaks, and Windows reports
+    0 bytes.
+  </p>
+
+  <p>
+    A free tool called <strong>H2testw</strong> (or <strong>FakeFlashTest</strong>
+    on Linux) writes test patterns to the entire drive and reports the
+    real capacity. After identifying the true size, you can use
+    diskpart to create a partition only as large as the real flash —
+    the drive then becomes safe to use, just much smaller than
+    advertised.
+  </p>
+
+  <div class="callout">
+    <strong>Tip.</strong> If you bought the drive recently, request a
+    refund. A counterfeit drive will fail again — usually with the
+    files you cared about most on it.
+  </div>
+
+  <h2>Quick recap</h2>
+
+  <ol>
+    <li>If you have important files, run a recovery scan first.</li>
+    <li>Try CHKDSK (almost never works, but worth 30 seconds).</li>
+    <li>Use diskpart <code>clean → create partition → format</code>
+        — or click <strong>Advanced Repair</strong> in USB Fix Tool.</li>
+    <li>If diskpart fails, reach for the vendor's low-level format
+        utility.</li>
+    <li>If you bought the drive cheap online, test for fake capacity
+        before trusting it again.</li>
+  </ol>
+
+  <p>
+    A 0-byte USB drive is one of the easiest "broken hardware" cases
+    to fix yourself. Five minutes with diskpart, and the stick is
+    usually back to its full advertised size — no software purchase
+    needed.
+  </p>
+
+  <p>
+    <a href="../download.html">Download USB Fix Tool</a> to get the
+    diskpart rebuild as a one-click button, with safety checks and a
+    live log so you can see exactly what's happening.
+  </p>
+
+  <h2>Frequently asked questions</h2>
+
+  <h3>My USB shows 0 bytes — does that mean the drive is dead?</h3>
+  <p>
+    Almost never. In 90%+ of cases the flash chip itself is healthy
+    and the partition table is corrupt. Diskpart rewrites the table,
+    and the drive's real capacity returns. A truly dead chip is
+    obvious — Windows reports it as <em>"unrecognised device"</em> on
+    every PC, plays no insert sound, and shows zero current draw on a
+    USB power meter.
+  </p>
+
+  <h3>Can I fix a 0-byte USB drive without erasing it?</h3>
+  <p>
+    Sometimes yes. Try TestDisk (free, open source) before reaching
+    for diskpart — it can rebuild the partition entry without
+    touching data sectors. If TestDisk finds the original partition
+    and your folders, write the recovered table back and you're done
+    with files intact.
+  </p>
+
+  <h3>Why does my USB drive randomly drop to 0 bytes?</h3>
+  <p>
+    Three usual suspects: a flaky USB cable that briefly loses power
+    mid-write, an over-aggressive antivirus product locking the
+    drive during a scan, or a counterfeit stick that's silently
+    overwriting its own partition table once you exceed real
+    capacity. Test the drive with H2testw to rule out fake capacity.
+  </p>
+
+  <h3>What's the difference between Format and Advanced Repair in USB Fix Tool?</h3>
+  <p>
+    <strong>Format</strong> writes a fresh file-system header on the
+    existing partition — fast, but it can't fix a broken partition
+    table. <strong>Advanced Repair</strong> first runs diskpart
+    <code>clean</code> to wipe the partition table, then creates a new
+    primary partition spanning the full real capacity of the flash,
+    then formats it. Use Format first; Advanced Repair when Format
+    fails or the drive still reports the wrong size.
+  </p>
+
+  <h3>Can I trust low-cost "1 TB" USB drives from marketplaces?</h3>
+  <p>
+    No. Prices for legitimate 1 TB flash media start far above $9.
+    Bargain marketplace listings are almost always counterfeit
+    drives flashed to <em>report</em> a fake capacity. They work
+    until you fill the real flash, then files start corrupting and
+    the drive eventually shows 0 bytes. Buy from authorised resellers
+    only.
+  </p>
+
+  <h3>Will diskpart erase my files permanently?</h3>
+  <p>
+    Diskpart <code>clean</code> wipes the partition table but doesn't
+    touch every data sector — recovery software can usually still
+    pull files back from the unallocated space. <code>clean
+    all</code> (note the trailing word) does a full sector wipe and
+    is unrecoverable. USB Fix Tool only ever runs the safer
+    <code>clean</code> variant.
+  </p>
+
+  <div class="divider"></div>
+  <p class="muted" style="font-size:14px">
+    Last updated · January 2026
+  </p>
+</article>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>© 2026 USB Fix Tool — free for personal use.</div>
+    <div>
+      <a href="../index.html">Home</a> &nbsp;·&nbsp;
+      <a href="../download.html">Download</a> &nbsp;·&nbsp;
+      <a href="../blog.html">Blog</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

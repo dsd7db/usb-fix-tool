@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How to Repair a Corrupted USB Drive (Free, No Software Needed)</title>
+<meta name="description" content="Learn how to repair a corrupted USB drive on Windows step by step using CHKDSK, format and diskpart. Free, beginner-friendly guide for 2026.">
+<meta name="keywords" content="repair corrupted usb drive, fix corrupted flash drive, chkdsk usb, usb repair windows, fix damaged pendrive">
+<link rel="canonical" href="https://example.com/blog/repair-corrupted-usb.html" />
+
+<meta property="og:type" content="article" />
+<meta property="og:title" content="How to Repair a Corrupted USB Drive" />
+<meta property="og:description" content="From CHKDSK to diskpart — the right order to fix corruption without losing data." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav">
+    <a class="brand" href="../index.html">USB Fix Tool<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../download.html">Download</a>
+      <a href="../blog.html">Blog</a>
+    </nav>
+  </div>
+</header>
+
+<article class="article">
+  <header>
+    <span class="post-meta">Tutorial · 10 min read</span>
+    <h1>How to Repair a Corrupted USB Drive</h1>
+    <p class="muted">
+      A corrupted USB stick is rarely truly broken — it's a software
+      problem that looks like a hardware one. This guide walks through
+      the exact order of repairs to try, why each one works, and how to
+      avoid the all-too-common "I formatted it and now my files are
+      gone" disaster.
+    </p>
+  </header>
+
+  <div class="ad-slot" aria-label="Advertisement">
+    Ad slot — 728×90
+    <small>Replace with AdSense unit when ready</small>
+  </div>
+
+  <h2>What "corrupted" actually means</h2>
+
+  <p>
+    When people say a USB drive is corrupted they usually mean one of
+    four things:
+  </p>
+
+  <ul>
+    <li><strong>You can see it but not read it.</strong> Errors like
+        <em>"The file or directory is corrupted and unreadable"</em> or
+        <em>"The parameter is incorrect"</em> on every double-click.</li>
+    <li><strong>It mounts as RAW.</strong> Windows asks you to format
+        before you can access it. <em>Don't.</em></li>
+    <li><strong>It shows the wrong size.</strong> A 32 GB stick reports
+        as 8 MB, 0 bytes, or "200 GB" (counterfeit drives do this).</li>
+    <li><strong>It's stuck read-only.</strong> Every write fails with
+        <em>"The disk is write-protected"</em>.</li>
+  </ul>
+
+  <p>
+    Each one has a different fix. Don't reach for the format button
+    until you've tried the non-destructive options first.
+  </p>
+
+  <h2>Before you do anything: copy what you can</h2>
+
+  <p>
+    If the drive opens at all — even slowly, even with errors — drag
+    your important files off it now. A failing flash chip can flip
+    from "barely working" to "completely dead" between two
+    double-clicks. Copy first, fix second.
+  </p>
+
+  <p>
+    If File Explorer refuses to open the drive at all, skip to the
+    recovery section at the end of this guide before running any of
+    the repair commands below.
+  </p>
+
+  <h2>Fix 1 — CHKDSK (the safe first attempt)</h2>
+
+  <p>
+    CHKDSK is built into Windows and repairs file-system corruption
+    without erasing data. It's the right starting point for almost
+    every <em>"corrupt and unreadable"</em> error.
+  </p>
+
+  <ol>
+    <li>Press <code>Win + S</code>, type <code>cmd</code>, right-click
+        <strong>Command Prompt</strong> → <strong>Run as
+        administrator</strong>.</li>
+    <li>Type the command, replacing <code>F:</code> with your drive
+        letter:</li>
+  </ol>
+
+  <pre><code>chkdsk F: /F /R /X</code></pre>
+
+  <ul>
+    <li><code>/F</code> — fix errors it finds.</li>
+    <li><code>/R</code> — locate bad sectors and recover readable
+        information.</li>
+    <li><code>/X</code> — force-dismount the volume first so other
+        processes can't keep handles open.</li>
+  </ul>
+
+  <p>
+    A clean run finishes with <em>"Windows has made corrections to the
+    file system"</em>. You can usually open the drive normally
+    afterwards. If CHKDSK errors out with <em>"Cannot open volume for
+    direct access"</em> or refuses with <em>"the type of the file
+    system is RAW"</em>, move on.
+  </p>
+
+  <p>
+    USB Fix Tool runs the same command at the click of a button, with
+    the live output streamed to the in-app log so you don't have to
+    watch a black command prompt scroll silently.
+  </p>
+
+  <h2>Fix 2 — Refresh the partition (Disk Management)</h2>
+
+  <p>
+    Some "corruption" is just a confused partition table. Disk
+    Management can sometimes fix it without a full wipe.
+  </p>
+
+  <ol>
+    <li>Press <code>Win + X</code> → <strong>Disk Management</strong>.</li>
+    <li>If the partition is shown but has a question mark next to its
+        size, right-click → <strong>Change Drive Letter and Paths</strong>
+        → assign a fresh letter.</li>
+    <li>If you see <em>"unallocated"</em> across the whole disk, the
+        partition entry is gone — do not create a new one yet (that
+        will overwrite the directory). Run a recovery scan first.</li>
+  </ol>
+
+  <h2>Fix 3 — Quick format (only after backing up)</h2>
+
+  <p>
+    A quick format rewrites the file-system header without touching
+    the data sectors. It's fast and almost always works on logically
+    corrupted drives — but it does mark every file as deleted, so
+    treat it as a one-way trip unless you've copied your files
+    elsewhere.
+  </p>
+
+  <pre><code>format F: /FS:FAT32 /Q /V:USB</code></pre>
+
+  <p>Or, in USB Fix Tool:</p>
+
+  <ol>
+    <li>Select the drive.</li>
+    <li>Pick the file system (FAT32 for compatibility, exFAT for files
+        larger than 4 GB, NTFS for Windows-only sticks).</li>
+    <li>Tick the confirmation checkbox → click <strong>Format</strong>.</li>
+  </ol>
+
+  <h3>Which file system should I pick?</h3>
+  <ul>
+    <li><strong>FAT32</strong> — universal, but cannot store single
+        files larger than 4 GB. Ideal for sticks under 32 GB used with
+        TVs, car stereos and old game consoles.</li>
+    <li><strong>exFAT</strong> — modern, supports huge files, works on
+        Windows and macOS. Best default for general-purpose USB sticks.</li>
+    <li><strong>NTFS</strong> — Windows-native, supports permissions
+        and journaling. Use it for Windows-only sticks (e.g. PC
+        backups).</li>
+  </ul>
+
+  <h2>Fix 4 — Full diskpart rebuild</h2>
+
+  <p>
+    If even formatting fails ("Windows was unable to complete the
+    format"), the partition table is so damaged that the OS can't
+    place a new file system. Diskpart wipes it and rebuilds from
+    scratch.
+  </p>
+
+  <pre><code>diskpart
+list disk
+select disk N
+attributes disk clear readonly
+clean
+create partition primary
+active
+format fs=exfat quick
+assign
+exit</code></pre>
+
+  <p>
+    The same script lives behind the <strong>Advanced Repair</strong>
+    button in USB Fix Tool, with an extra confirmation step so you
+    don't accidentally clean your boot drive.
+  </p>
+
+  <div class="callout">
+    <strong>Triple-check the disk number.</strong> <code>list disk</code>
+    shows every disk in the system. Match the size carefully —
+    selecting the wrong one will erase your operating system.
+  </div>
+
+  <h2>Fix 5 — Vendor low-level format tools</h2>
+
+  <p>
+    For SanDisk, Kingston, Transcend and other major brands, the
+    manufacturer's own "low-level format" tool sometimes recovers
+    drives that Windows refuses entirely. They generally erase the
+    flash chip's controller state, which clears stuck write-protect
+    flags. Use these only after the steps above have failed.
+  </p>
+
+  <h2>If your data was on the drive</h2>
+
+  <p>
+    Format and diskpart both wipe the visible directory. The actual
+    data is still on the flash chip until something overwrites it —
+    which is why dedicated recovery software can pull files back hours,
+    days, even weeks after a format. The catch: every minute you keep
+    using the drive, the recovery rate drops.
+  </p>
+
+  <div class="affiliate-box">
+    <div>
+      <h3>Run a recovery scan first</h3>
+      <p>
+        If you've already formatted the drive, stop writing to it and
+        run a recovery scan now. Modern tools recover photos, Office
+        documents and videos with surprisingly high success rates.
+      </p>
+    </div>
+    <a class="btn btn-affiliate" href="https://example.com/recover?ref=usbfixtool" target="_blank" rel="nofollow sponsored noopener">
+      Recover lost files →
+    </a>
+  </div>
+
+  <h2>Avoiding corruption next time</h2>
+
+  <ul>
+    <li>Always use <strong>Eject</strong> (or "Safely remove") before
+        unplugging.</li>
+    <li>Don't leave a USB stick in a hot car — flash chips tolerate
+        heat poorly.</li>
+    <li>Buy from reputable sellers — counterfeit drives are the #1
+        cause of "0 bytes" reports.</li>
+    <li>If you carry the same stick between Windows and macOS, format
+        it as <strong>exFAT</strong>.</li>
+    <li>Keep a copy of <a href="../download.html">USB Fix Tool</a> on
+        a working stick. When the next one fails you'll be five
+        minutes away from a fix.</li>
+  </ul>
+
+  <h2>Recap</h2>
+
+  <ol>
+    <li>Copy off any readable files first.</li>
+    <li>Run <code>chkdsk /F /R /X</code>.</li>
+    <li>Quick-format with the right file system.</li>
+    <li>Rebuild with diskpart if format fails.</li>
+    <li>Recover lost files with dedicated software if needed.</li>
+  </ol>
+
+  <p>
+    Done in order, this works on the overwhelming majority of
+    "corrupted" USB drives — without paying a cent for software you
+    didn't already have on your PC.
+  </p>
+
+  <h2>Frequently asked questions</h2>
+
+  <h3>How long does CHKDSK take on a USB drive?</h3>
+  <p>
+    A clean 32 GB stick typically finishes in two to five minutes. If
+    you add the <code>/R</code> flag and the drive has many bad
+    sectors, expect 30 minutes to several hours — CHKDSK has to read
+    every sector, retry failures and remap them. Larger drives scale
+    roughly linearly.
+  </p>
+
+  <h3>Should I use quick format or full format?</h3>
+  <p>
+    For a healthy drive that's just become corrupt, quick format is
+    fine and ten times faster. Full format additionally writes zeros
+    to every sector — useful if you suspect bad blocks (it forces the
+    controller to remap them) or if you're handing the drive on to
+    someone else.
+  </p>
+
+  <h3>Can I repair a write-protected USB drive?</h3>
+  <p>
+    Check the physical lock switch first (SD cards mostly).
+    If there's no switch, run diskpart and execute <code>attributes
+    disk clear readonly</code> on the selected disk — that's the line
+    USB Fix Tool's Advanced Repair runs automatically. If the
+    read-only state survives, the drive's controller has flipped its
+    own write-protect flag and you'll need a vendor low-level format
+    utility.
+  </p>
+
+  <h3>Why does my USB drive keep getting corrupted?</h3>
+  <p>
+    The two most common causes are unsafe ejection (always use
+    <em>Eject</em> in the system tray) and counterfeit drives that
+    silently drop writes once you exceed their real capacity. If a
+    drive corrupts repeatedly within weeks of a fix, it's almost
+    certainly a fake — replace it.
+  </p>
+
+  <div class="divider"></div>
+  <p class="muted" style="font-size:14px">
+    Last updated · January 2026
+  </p>
+</article>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>© 2026 USB Fix Tool — free for personal use.</div>
+    <div>
+      <a href="../index.html">Home</a> &nbsp;·&nbsp;
+      <a href="../download.html">Download</a> &nbsp;·&nbsp;
+      <a href="../blog.html">Blog</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>USB Not Recognized Fix: Step-by-Step Guide (2026) — USB Fix Tool</title>
+<meta name="description" content="USB drive not recognized in Windows? Follow this step-by-step guide to fix it: driver refresh, drive letter assignment, CHKDSK, format and full diskpart rebuild.">
+<meta name="keywords" content="usb not recognized, usb not detected, windows doesn't see usb, fix usb drive, repair flash drive">
+<link rel="canonical" href="https://example.com/blog/usb-not-recognized-fix.html" />
+
+<meta property="og:type" content="article" />
+<meta property="og:title" content="USB Not Recognized Fix (Step-by-Step Guide)" />
+<meta property="og:description" content="Five proven fixes when Windows refuses to mount your flash drive." />
+<meta property="og:url" content="https://example.com/blog/usb-not-recognized-fix.html" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "USB Not Recognized Fix — Step by Step",
+  "description": "Five fixes for a USB drive that Windows refuses to recognize.",
+  "step": [
+    {"@type":"HowToStep","name":"Try a different port and PC"},
+    {"@type":"HowToStep","name":"Refresh the USB driver in Device Manager"},
+    {"@type":"HowToStep","name":"Assign a new drive letter in Disk Management"},
+    {"@type":"HowToStep","name":"Run CHKDSK to repair the file system"},
+    {"@type":"HowToStep","name":"Rebuild the partition with diskpart"}
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav">
+    <a class="brand" href="../index.html">USB Fix Tool<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../download.html">Download</a>
+      <a href="../blog.html">Blog</a>
+    </nav>
+  </div>
+</header>
+
+<article class="article">
+  <header>
+    <span class="post-meta">Step-by-step · 9 min read</span>
+    <h1>USB Not Recognized Fix (Step-by-Step Guide)</h1>
+    <p class="muted">
+      Plug in a USB stick, get nothing — no drive letter, no notification,
+      sometimes not even a beep. Below are the five fixes that solve this
+      for the vast majority of flash drives, ordered from <em>safest</em>
+      to <em>most invasive</em>. Try them in order.
+    </p>
+  </header>
+
+  <!-- Ad slot -->
+  <div class="ad-slot" aria-label="Advertisement">
+    Ad slot — 728×90
+    <small>Replace with AdSense unit when ready</small>
+  </div>
+
+  <p>
+    A USB drive that "isn't recognized" can mean a lot of things in
+    Windows: it shows up in Device Manager as <em>Unknown Device</em>,
+    it appears in Disk Management without a letter, it's listed in
+    File Explorer but throws an error on every click, or it doesn't
+    appear anywhere at all. The good news: these are usually
+    software-side problems and can be fixed in five to ten minutes
+    without any paid tools.
+  </p>
+
+  <p>
+    The order below is deliberate. Each step is non-destructive until
+    Step 5 — never jump straight to formatting unless you've copied
+    your data first (or you accept losing it).
+  </p>
+
+  <h2>Step 1 — Rule out the cable, port and PC</h2>
+
+  <p>
+    Easily 30% of "broken USB" calls turn out to be a flaky front-panel
+    port or a tired extension cable. Spend two minutes on this before
+    anything else:
+  </p>
+
+  <ul>
+    <li>Plug the drive into a different USB port — preferably one on the
+        back of a desktop PC, directly on the motherboard.</li>
+    <li>Skip USB hubs and front-panel headers for the test.</li>
+    <li>If you have a second computer (a laptop counts), try the drive
+        there. If it works, the original PC's controller or driver is
+        the culprit, not the drive.</li>
+    <li>Inspect the connector for bent pins or pocket lint.</li>
+  </ul>
+
+  <p>
+    Listen for the standard Windows "ding" when you plug in. If you
+    hear nothing on any port and on any PC, you're likely dealing with
+    a hardware failure inside the drive itself — software fixes can't
+    bring it back, but recovery software sometimes still can.
+  </p>
+
+  <h2>Step 2 — Refresh the USB driver</h2>
+
+  <p>
+    Windows occasionally caches a stale or corrupt driver for a
+    specific stick. Reinstalling it forces a clean enumeration:
+  </p>
+
+  <ol>
+    <li>Press <code>Win + X</code> → <strong>Device Manager</strong>.</li>
+    <li>Expand <strong>Disk drives</strong> (and <strong>Universal Serial
+        Bus controllers</strong>).</li>
+    <li>Find your drive (it may say <em>Unknown Device</em>). Right-click
+        → <strong>Uninstall device</strong>.</li>
+    <li>Unplug the USB stick, wait five seconds, plug it back in.
+        Windows reinstalls the driver automatically.</li>
+  </ol>
+
+  <div class="callout">
+    <strong>Tip.</strong> If the drive shows a yellow exclamation mark,
+    open its <em>Properties → Driver → Update driver → Search
+    automatically</em>. That fixes the bulk of "Code 43" errors.
+  </div>
+
+  <h2>Step 3 — Assign a drive letter</h2>
+
+  <p>
+    Sometimes the drive mounts perfectly but Windows doesn't give it a
+    letter — usually because another mapped drive (a network share, a
+    Veracrypt volume) is already squatting on the next free letter.
+    File Explorer hides drives without letters, so the stick looks
+    invisible.
+  </p>
+
+  <ol>
+    <li>Press <code>Win + X</code> → <strong>Disk Management</strong>.</li>
+    <li>Find your USB stick by its size — it usually shows a healthy
+        partition with no letter.</li>
+    <li>Right-click the partition → <strong>Change Drive Letter and
+        Paths…</strong> → <strong>Add</strong> → pick a free letter
+        like <code>F:</code> or <code>G:</code>.</li>
+  </ol>
+
+  <p>
+    Or use USB Fix Tool's <strong>Assign Letter</strong> button — it
+    runs the same diskpart commands behind the scenes.
+  </p>
+
+  <h2>Step 4 — Run CHKDSK to repair the file system</h2>
+
+  <p>
+    If the drive shows up but errors out on read ("the parameter is
+    incorrect", "the file or directory is corrupted"), the file system
+    is damaged but the drive itself is fine. CHKDSK rebuilds the
+    file-system metadata in place — and almost always preserves your
+    files.
+  </p>
+
+  <pre><code>chkdsk F: /F /R /X</code></pre>
+
+  <p>
+    <code>/F</code> fixes errors, <code>/R</code> recovers readable
+    information from bad sectors, and <code>/X</code> dismounts the
+    volume first so other handles don't fight CHKDSK.
+  </p>
+
+  <p>
+    In USB Fix Tool, select the drive and click <strong>Run CHKDSK</strong>
+    — the same command runs and the live output appears in the log
+    console.
+  </p>
+
+  <div class="callout">
+    <strong>If the log says "RAW".</strong> CHKDSK refuses to fix RAW
+    file systems. Skip ahead to our
+    <a href="fix-raw-usb-drive.html">RAW USB guide</a> — running format
+    on a RAW drive immediately destroys recoverable data.
+  </div>
+
+  <h2>Step 5 — Rebuild the partition with diskpart</h2>
+
+  <p>
+    When CHKDSK can't help and the drive is still readable in Disk
+    Management, the partition table itself is broken. Rebuilding it
+    with <code>diskpart</code> fixes the most stubborn cases — but
+    <strong>this erases the drive</strong>. Recover anything you need
+    first.
+  </p>
+
+  <p>You can do it manually:</p>
+
+  <pre><code>diskpart
+list disk
+select disk N        REM N = your USB disk number
+attributes disk clear readonly
+clean
+create partition primary
+active
+format fs=fat32 quick
+assign
+exit</code></pre>
+
+  <p>
+    Or simply click <strong>Advanced Repair</strong> in USB Fix Tool —
+    same script, same result, with a confirmation dialog so you can't
+    nuke the wrong disk by accident.
+  </p>
+
+  <h2>Why is my brand-new USB still not recognized?</h2>
+
+  <ul>
+    <li><strong>Mass-counterfeit drives.</strong> Cheap "1 TB" sticks
+        from random marketplaces report a fake capacity. Windows tries
+        to write past the real flash size and the drive locks up. A
+        full diskpart <code>clean</code> + format usually exposes the
+        true size.</li>
+    <li><strong>Write-protect switch.</strong> SD cards (and a few USB
+        sticks) have a tiny lock switch on the side. If it's engaged,
+        Windows refuses every write — including format.</li>
+    <li><strong>Power-only cable.</strong> Some USB-C cables only carry
+        power. If you're using a phone cable, swap it for a known
+        data-capable one.</li>
+  </ul>
+
+  <h2>Already lost files?</h2>
+
+  <p>
+    If a hasty format wiped your photos, documents or videos, stop
+    using the drive immediately and run a recovery scan first. The
+    longer you keep writing to a drive after deletion, the lower the
+    recovery rate — every new file potentially overwrites the old
+    sectors.
+  </p>
+
+  <div class="affiliate-box">
+    <div>
+      <h3>Recover lost files in three clicks</h3>
+      <p>
+        Dedicated recovery software scans your drive sector by sector
+        and pulls back photos, documents and videos that File Explorer
+        has long forgotten about.
+      </p>
+    </div>
+    <a class="btn btn-affiliate" href="https://example.com/recover?ref=usbfixtool" target="_blank" rel="nofollow sponsored noopener">
+      Recover lost files →
+    </a>
+  </div>
+
+  <h2>Quick recap</h2>
+
+  <ol>
+    <li>Try another port / cable / PC.</li>
+    <li>Reinstall the USB driver in Device Manager.</li>
+    <li>Assign a new drive letter in Disk Management.</li>
+    <li>Run CHKDSK <code>/F /R /X</code>.</li>
+    <li>Recover data, then rebuild the partition with diskpart.</li>
+  </ol>
+
+  <p>
+    USB Fix Tool exposes steps 3–5 as one-click buttons with a live
+    log. <a href="../download.html">Grab the free copy</a> and keep it
+    on a working USB stick — it's saved more than one tech-support
+    afternoon.
+  </p>
+
+  <h2>Frequently asked questions</h2>
+
+  <h3>Why does my USB show up in Device Manager but not File Explorer?</h3>
+  <p>
+    The driver is fine but the partition either has no drive letter
+    or is unallocated. Open Disk Management (<code>Win + X</code> →
+    Disk Management) and look for the drive by its capacity. If it
+    has a partition without a letter, assign one. If the entire disk
+    is "unallocated", run a recovery scan first, then create a fresh
+    partition with diskpart or USB Fix Tool's Advanced Repair.
+  </p>
+
+  <h3>Will CHKDSK delete my files?</h3>
+  <p>
+    No. CHKDSK with <code>/F</code> repairs the file-system metadata
+    in place. It can move corrupt files into <em>Found.000</em>
+    folders, but it doesn't intentionally delete data. Format and
+    diskpart, on the other hand, do erase the directory.
+  </p>
+
+  <h3>The drive works on another PC. What's wrong with mine?</h3>
+  <p>
+    Most likely a cached USB driver entry on your machine. In Device
+    Manager open <em>View → Show hidden devices</em>, expand
+    <em>Universal Serial Bus controllers</em>, and uninstall any
+    greyed-out entries that match your stick. Reboot, plug back in,
+    Windows reinstalls the driver from scratch.
+  </p>
+
+  <h3>Can I fix a USB drive without losing data?</h3>
+  <p>
+    Often yes — CHKDSK and TestDisk are non-destructive. But if the
+    file system is RAW or the partition table is gone, you'll need to
+    recover files first (with dedicated software), then repair. Never
+    let Windows' "format the disk" prompt run on a drive whose data
+    you still want.
+  </p>
+
+  <h3>Is USB Fix Tool safe?</h3>
+  <p>
+    USB Fix Tool only calls Windows' own commands (<code>chkdsk</code>,
+    <code>format</code>, <code>diskpart</code>) — exactly what an admin
+    command prompt does. The source is published, the build doesn't
+    use UPX or any obfuscation, and every command appears live in the
+    log so you can verify what's running.
+  </p>
+
+  <div class="divider"></div>
+  <p class="muted" style="font-size:14px">
+    Last updated · January 2026
+  </p>
+</article>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>© 2026 USB Fix Tool — free for personal use.</div>
+    <div>
+      <a href="../index.html">Home</a> &nbsp;·&nbsp;
+      <a href="../download.html">Download</a> &nbsp;·&nbsp;
+      <a href="../blog.html">Blog</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>
