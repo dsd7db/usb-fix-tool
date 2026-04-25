@@ -23,7 +23,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('assets', 'assets')],   # bundle SVG checkmark + future assets
     hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],

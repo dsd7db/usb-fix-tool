@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import sys
 import webbrowser
+from pathlib import Path
 from typing import List, Optional
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
@@ -51,6 +52,17 @@ import usb_utils
 # Replace this with your real affiliate URL when publishing.
 AFFILIATE_URL = "https://example.com/recover?ref=usbfixtool"
 APP_VERSION = "1.0.0"
+
+
+def _asset_path(name: str) -> str:
+    """
+    Absolute filesystem path to an asset, normalised with forward
+    slashes so it works as a Qt stylesheet `url(...)` value on every
+    platform. Resolves correctly when run from source AND when frozen
+    by PyInstaller (uses sys._MEIPASS).
+    """
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return (base / "assets" / name).as_posix()
 
 
 # ---------------------------------------------------------------------------
@@ -86,6 +98,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(f"USB Fix Tool  v{APP_VERSION}")
         self.resize(960, 680)
+        self.setMinimumSize(720, 560)   # responsive floor
         self._thread: Optional[QThread] = None
         self._worker: Optional[CommandWorker] = None
         self._devices: List[usb_utils.UsbDevice] = []
@@ -137,6 +150,10 @@ class MainWindow(QMainWindow):
     def _build_promo(self) -> QWidget:
         box = QFrame()
         box.setObjectName("promo")
+        # Hug content vertically so it never steals space from the table.
+        box.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+        )
         h = QHBoxLayout(box)
         h.setContentsMargins(16, 12, 16, 12)
 
@@ -197,12 +214,21 @@ class MainWindow(QMainWindow):
         )
         self.table.horizontalHeader().setHighlightSections(False)
         self.table.verticalHeader().setDefaultSectionSize(38)
-        v.addWidget(self.table)
+        # Let the table fill the device card vertically/horizontally
+        self.table.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        v.addWidget(self.table, stretch=1)
         return wrap
 
     def _build_action_section(self) -> QWidget:
         wrap = QFrame()
         wrap.setObjectName("card")
+        # The action card hugs its content vertically so the table and
+        # log share the rest of the window cleanly when resizing.
+        wrap.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum
+        )
         outer = QVBoxLayout(wrap)
         outer.setContentsMargins(14, 12, 14, 14)
         outer.setSpacing(10)
@@ -318,8 +344,11 @@ class MainWindow(QMainWindow):
         return wrap
 
     def _apply_dark_theme(self) -> None:
-        self.setStyleSheet(
-            """
+        check_svg = _asset_path("check.svg")
+        self.setStyleSheet(self._STYLESHEET.replace("__CHECK_SVG__",
+                                                    check_svg))
+
+    _STYLESHEET = """
             /* ---------- base ----------------------------------------- */
             QMainWindow, QWidget {
                 background-color: #0f1115;
@@ -427,10 +456,12 @@ class MainWindow(QMainWindow):
             QCheckBox::indicator:checked {
                 background-color: #ff8a3d;
                 border-color: #ff8a3d;
+                image: url("__CHECK_SVG__");
             }
             QCheckBox::indicator:checked:hover {
                 background-color: #ffa362;
                 border-color: #ffa362;
+                image: url("__CHECK_SVG__");
             }
             QCheckBox::indicator:disabled {
                 border-color: #2a3046;
@@ -531,8 +562,7 @@ class MainWindow(QMainWindow):
             QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
                 height: 0;
             }
-            """
-        )
+    """
 
     # -- helpers ------------------------------------------------------------
     def log(self, message: str) -> None:
@@ -741,6 +771,10 @@ class MainWindow(QMainWindow):
 
 
 def main() -> int:
+    # Crisp scaling on HD / FHD / 4K and fractional-DPI displays.
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("USB Fix Tool")
     app.setOrganizationName("USB Fix Tool")
