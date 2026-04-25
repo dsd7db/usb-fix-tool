@@ -167,9 +167,13 @@ class MainWindow(QMainWindow):
         text.setSizePolicy(QSizePolicy.Policy.Expanding,
                            QSizePolicy.Policy.Preferred)
 
-        btn = QPushButton("Recover Lost Files")
+        btn = QPushButton("Recover Lost Files  (Recommended)")
         btn.setObjectName("promoBtn")
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setToolTip(
+            "Open dedicated recovery software in your browser — "
+            "best chance to restore photos, documents and videos."
+        )
         btn.clicked.connect(lambda: webbrowser.open(AFFILIATE_URL))
 
         h.addWidget(text, stretch=1)
@@ -280,14 +284,26 @@ class MainWindow(QMainWindow):
         row3 = QHBoxLayout()
         row3.setSpacing(8)
         self.btn_chkdsk = self._make_button("Run CHKDSK", self.act_chkdsk)
+        self.btn_chkdsk.setToolTip(
+            "Fix file system errors without deleting data."
+        )
         self.btn_format = self._make_button(
             "Format", self.act_format, danger=True
+        )
+        self.btn_format.setToolTip(
+            "Erase all data and reformat the drive."
         )
         self.btn_advanced = self._make_button(
             "Advanced Repair", self.act_advanced, danger=True
         )
+        self.btn_advanced.setToolTip(
+            "Reinitialize drive (may erase all data)."
+        )
         self.btn_assign = self._make_button(
             "Assign Letter", self.act_assign
+        )
+        self.btn_assign.setToolTip(
+            "Assign or change drive letter."
         )
         for b in (self.btn_chkdsk, self.btn_format,
                   self.btn_advanced, self.btn_assign):
@@ -684,10 +700,16 @@ class MainWindow(QMainWindow):
         self._worker = None
         self.log(f"--- finished (code {code}) ---\n")
         if code == 0:
-            self._set_status("Done", busy=False, tone="ok")
+            self._set_status(
+                "Operation completed successfully",
+                busy=False, tone="ok"
+            )
         else:
-            self._set_status(f"Finished with errors (code {code})",
-                             busy=False, tone="err")
+            self._set_status(
+                f"Operation failed (code {code}). "
+                "Try Advanced Repair or check if the drive is in use.",
+                busy=False, tone="err"
+            )
         self.refresh_devices()
 
         # Friendly affiliate nudge after a destructive op completes
@@ -705,6 +727,7 @@ class MainWindow(QMainWindow):
         self._start_worker(
             usb_utils.run_chkdsk, dev.drive_letter,
             status=f"Running CHKDSK on {dev.drive_letter}…"
+                   "  please wait"
         )
 
     def act_format(self) -> None:
@@ -726,7 +749,7 @@ class MainWindow(QMainWindow):
             self.label_input.text().strip(),
             True,  # quick
             status=f"Formatting {dev.drive_letter} as "
-                   f"{self.fs_combo.currentText()}…"
+                   f"{self.fs_combo.currentText()}… please wait"
         )
 
     def act_advanced(self) -> None:
@@ -782,7 +805,8 @@ class MainWindow(QMainWindow):
             return
         self._start_worker(
             usb_utils.assign_drive_letter, disk_no, new_letter,
-            status=f"Assigning letter {new_letter.upper()}: to Disk {disk_no}…"
+            status=f"Assigning letter {new_letter.upper()}: "
+                   f"to disk {disk_no}…"
         )
 
 
