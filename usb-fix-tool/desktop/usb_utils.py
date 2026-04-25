@@ -38,12 +38,20 @@ class UsbDevice:
     drive_type: str = "Removable"
 
     @property
+    def used_bytes(self) -> int:
+        return max(0, self.size_bytes - self.free_bytes)
+
+    @property
     def size_human(self) -> str:
         return _human_size(self.size_bytes)
 
     @property
     def free_human(self) -> str:
         return _human_size(self.free_bytes)
+
+    @property
+    def used_human(self) -> str:
+        return _human_size(self.used_bytes)
 
 
 def _human_size(num: int) -> str:
