@@ -443,3 +443,91 @@ def format_partition(expected: UsbDisk, partition_number: int,
     else:
         log("[error] USB formatting failed.")
     return code
+
+
+def repair_fake_drive(expected: UsbDisk, size_mb: int, fs: str,
+                      label: str, quick: bool, log: LogFn) -> int:
+    """
+    Multi-step Fix Fake Drive workflow. Each destructive sub-step
+    (delete/create/format) internally re-verifies USB identity via
+    _pre_check before touching the disk. Aborts on the first failed
+    step and reports partial state honestly.
+
+    Returns 0 = full success, 2 = partial (layout modified but not
+    completed), 1 = failed before any destructive change / identity.
+    """
+    log("[step] Step 1/7 — Verifying USB identity...")
+    fresh = _pre_check(expected, log)
+    if fresh is None:
+        log("[error] Fix Fake Drive failed: USB identity could not be "
+            "verified. No changes were made.")
+        return 1
+    parts = list_partitions(fresh.number)
+    protected = [p for p in parts if p.protected]
+    if protected:
+        log(f"[error] Fix Fake Drive blocked: {len(protected)} "
+            "protected partition(s) present on this drive — the "
+            "layout cannot be fully cleared. No changes were made.")
+        return 1
+    if size_mb < MIN_PARTITION_MB:
+        log(f"[error] Invalid repair size: {size_mb} MB is below the "
+            f"{MIN_PARTITION_MB} MB minimum. No changes were made.")
+        return 1
+
+    log(f"[step] Step 2/7 — Deleting {len(parts)} existing "
+        "partition(s)...")
+    for p in sorted(parts, key=lambda x: -x.number):
+        log(f"Existing partition deletion started: partition "
+            f"{p.number} ({p.file_system or 'RAW'}, "
+            f"{p.size_bytes / 1024**2:.0f} MB).")
+        if delete_partition(fresh, p.number, log) != 0:
+            log("[error] Fix Fake Drive failed while deleting "
+                f"partition {p.number}. The drive may be in a "
+                "partial state — inspect it in the USB Partitions "
+                "tab.")
+            return 2
+
+    log("[step] Step 3/7 — Refreshing disk state...")
+    ok, reason, fresh = verify_identity(expected)
+    if not ok:
+        log(f"[error] USB identity changed after deletion — repair "
+            f"aborted. {reason} The drive is unpartitioned; recover "
+            "it manually in the USB Partitions tab.")
+        return 2
+    log(f"USB state refreshed: {fmt_mb(fresh.largest_free)} "
+        "unallocated.")
+
+    log(f"[step] Step 4/7 — Creating safe {size_mb} MB partition...")
+    if create_partition(fresh, size_mb, log) != 0:
+        log("[error] Fix Fake Drive partially completed: existing "
+            "partitions were deleted but the new partition could not "
+            "be created. Create it manually in the USB Partitions "
+            "tab.")
+        return 2
+
+    log("[step] Step 5/7 — Locating the new partition...")
+    parts = list_partitions(fresh.number)
+    new_part = max(parts, key=lambda p: p.number) if parts else None
+    if new_part is None:
+        log("[error] Fix Fake Drive partially completed: the new "
+            "partition could not be located after creation. Refresh "
+            "and format it manually in the USB Partitions tab.")
+        return 2
+
+    log(f"[step] Step 6/7 — Formatting partition {new_part.number} "
+        f"as {fs}...")
+    if format_partition(fresh, new_part.number, fs, label, quick,
+                        not new_part.drive_letter, log) != 0:
+        log("[error] Fix Fake Drive partially completed: the safe "
+            "partition was created but formatting failed. Format it "
+            "manually in the USB Partitions tab.")
+        return 2
+
+    log("[step] Step 7/7 — Refreshing final device state...")
+    log("[ok] Fix Fake Drive completed successfully. The drive now "
+        "exposes only its verified real capacity.")
+    return 0
+
+
+def fmt_mb(num: int) -> str:
+    return f"{num / 1024**2:.0f} MB"

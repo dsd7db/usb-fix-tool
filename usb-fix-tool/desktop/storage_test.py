@@ -102,6 +102,7 @@ class StorageTester:
         self.corrupt_blocks = 0
         self.write_errors = 0
         self.read_errors = 0
+        self.first_error_offset = -1    # lowest offset with bad data
         self.write_speed = 0.0
         self.read_speed = 0.0
         self._t0 = 0.0
@@ -238,6 +239,7 @@ class StorageTester:
                         data = f.read(want)
                     except OSError as e:
                         self.read_errors += 1
+                        self._note_error(start + pos)
                         self._log("error", f"Read error at offset "
                                            f"{fmt_bytes(start + pos)}: {e}")
                         break
@@ -246,6 +248,7 @@ class StorageTester:
                         lost = size - pos
                         self.corrupted_bytes += lost
                         self.corrupt_blocks += 1
+                        self._note_error(start + pos)
                         self._log("error",
                                   f"File truncated — {fmt_bytes(lost)} of "
                                   f"written data is missing "
@@ -277,6 +280,7 @@ class StorageTester:
         if bad:
             self.corrupt_blocks += 1
             self.corrupted_bytes += bad * 8
+            self._note_error(global_offset + first_bad * 8)
             if self._err_logged < 10:
                 self._err_logged += 1
                 self._log("error",
@@ -289,6 +293,10 @@ class StorageTester:
                                      "suppressed (see error counters).")
 
     # -- helpers -------------------------------------------------------
+    def _note_error(self, offset: int) -> None:
+        if self.first_error_offset < 0 or offset < self.first_error_offset:
+            self.first_error_offset = offset
+
     def _cleanup(self, files: List[Tuple[str, int, int]]) -> None:
         if self.keep_files:
             self._log("info", "Test files kept on the target device.")
@@ -367,6 +375,7 @@ class StorageTester:
             "lost_bytes": lost,
             "write_errors": self.write_errors,
             "verify_errors": self.read_errors + self.corrupt_blocks,
+            "first_error_offset": self.first_error_offset,
             "avg_write": avg_w,
             "avg_read": avg_r,
             "duration": time.monotonic() - self._t0,

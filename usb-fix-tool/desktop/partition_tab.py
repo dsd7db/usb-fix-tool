@@ -18,6 +18,8 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFrame,
     QGridLayout,
     QHBoxLayout,
@@ -51,6 +53,137 @@ LOG_COLORS = {
     "warning": "#9a6700",
     "error": "#c42b1c",
 }
+
+
+class FixFakeDriveDialog(QDialog):
+    """Repair preview + explicit confirmation for Fix Fake Drive."""
+
+    def __init__(self, parent, disk, partitions, payload) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Fix Fake Drive — Repair Preview")
+        self.setMinimumWidth(560)
+        self._payload = payload
+        self._safe_mb = int(payload["safe"] // MiB)
+
+        lay = QVBoxLayout(self)
+        lay.setSpacing(10)
+
+        title = QLabel("Proposed repair for a fake-capacity USB drive")
+        title.setObjectName("panelTitle")
+        lay.addWidget(title)
+
+        parts_txt = ("\n".join(
+            f"    • Partition {p.number}"
+            f"{(' (' + p.drive_letter + ':)') if p.drive_letter else ''}"
+            f" — {p.file_system or 'RAW'}, {fmt_bytes(p.size_bytes)}"
+            for p in partitions) or "    • (none — disk is RAW)")
+        summary = QLabel(
+            f"USB device:              {disk.model}\n"
+            f"Physical identity:       Disk {disk.number} "
+            f"(S/N {disk.serial or 'n/a'}"
+            f"{', ' + disk.vid_pid if disk.vid_pid else ''})\n"
+            f"Advertised capacity:     {fmt_bytes(payload['advertised'])}\n"
+            f"Verified usable:         {fmt_bytes(payload['usable'])}\n"
+            f"Safety margin:           {fmt_bytes(payload['margin'])}\n"
+            f"Maximum safe size:       {fmt_bytes(payload['safe'])}\n\n"
+            f"Partitions to be deleted:\n{parts_txt}")
+        summary.setObjectName("monoVal")
+        summary.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        lay.addWidget(summary)
+
+        form = QGridLayout()
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(6)
+        form.addWidget(QLabel("Repair partition size (MB):"), 0, 0)
+        self.size_spin = QSpinBox()
+        self.size_spin.setRange(partition_utils.MIN_PARTITION_MB,
+                                self._safe_mb)
+        self.size_spin.setValue(self._safe_mb)
+        self.size_spin.valueChanged.connect(self._update_preview)
+        form.addWidget(self.size_spin, 0, 1)
+        self.remain_label = QLabel("")
+        self.remain_label.setObjectName("noteText")
+        form.addWidget(self.remain_label, 0, 2)
+
+        form.addWidget(QLabel("File system:"), 1, 0)
+        self.fs_combo = QComboBox()
+        self.fs_combo.addItems(["FAT32", "exFAT", "NTFS"])
+        self.fs_combo.currentTextChanged.connect(self._update_preview)
+        form.addWidget(self.fs_combo, 1, 1)
+        form.addWidget(QLabel("Label:"), 2, 0)
+        self.label_input = QLineEdit()
+        self.label_input.setPlaceholderText("USB")
+        self.label_input.setMaxLength(11)
+        form.addWidget(self.label_input, 2, 1)
+        self.quick_check = QCheckBox("Quick format")
+        self.quick_check.setChecked(True)
+        form.addWidget(self.quick_check, 2, 2)
+        lay.addLayout(form)
+
+        self.layout_label = QLabel("")
+        self.layout_label.setObjectName("noteText")
+        self.layout_label.setWordWrap(True)
+        lay.addWidget(self.layout_label)
+
+        self.fs_warn = QLabel("")
+        self.fs_warn.setObjectName("adminNote")
+        self.fs_warn.setWordWrap(True)
+        self.fs_warn.setVisible(False)
+        lay.addWidget(self.fs_warn)
+
+        warn = QLabel(
+            "⚠ This operation will permanently erase all existing "
+            "partitions and data on the selected USB flash drive.")
+        warn.setObjectName("dangerNote")
+        warn.setWordWrap(True)
+        lay.addWidget(warn)
+
+        self.confirm_check = QCheckBox(
+            "I understand that all data on this USB drive will be "
+            "permanently erased.")
+        self.confirm_check.toggled.connect(self._update_preview)
+        lay.addWidget(self.confirm_check)
+
+        self.buttons = QDialogButtonBox()
+        self.btn_ok = self.buttons.addButton(
+            "Erase && Repair Drive",
+            QDialogButtonBox.ButtonRole.AcceptRole)
+        self.btn_ok.setObjectName("danger")
+        self.buttons.addButton(QDialogButtonBox.StandardButton.Cancel)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        lay.addWidget(self.buttons)
+        self._update_preview()
+
+    def _update_preview(self, *_): 
+        size_b = self.size_spin.value() * MiB
+        unused = self._payload["safe"] - size_b
+        self.remain_label.setText(
+            f"intentionally unused: {fmt_bytes(max(0, unused))}")
+        fs = self.fs_combo.currentText()
+        fat32_bad = (fs.upper() == "FAT32"
+                     and size_b > partition_utils.FAT32_MAX_BYTES)
+        self.fs_warn.setText(
+            "FAT32 cannot be formatted above 32 GB on Windows — "
+            "choose exFAT or NTFS, or reduce the size to 32 GB or "
+            "less.")
+        self.fs_warn.setVisible(fat32_bad)
+        self.layout_label.setText(
+            "Final expected layout: 1 primary partition of "
+            f"{fmt_bytes(size_b)} ({fs}), remainder of the advertised "
+            "capacity left unallocated on purpose (it is not real "
+            "storage).")
+        self.btn_ok.setEnabled(self.confirm_check.isChecked()
+                               and not fat32_bad)
+
+    def options(self) -> dict:
+        return {
+            "size_mb": self.size_spin.value(),
+            "fs": self.fs_combo.currentText(),
+            "label": self.label_input.text().strip(),
+            "quick": self.quick_check.isChecked(),
+        }
 
 
 class PartitionTab(QWidget):
@@ -292,6 +425,11 @@ class PartitionTab(QWidget):
     def log_line(self, message: str) -> None:
         """Route backend log lines to color levels by prefix."""
         low = message.lower()
+        if low.startswith("[step]"):
+            step = message[len("[step]"):].strip()
+            self.status_label.setText(step)
+            self.log("info", message)
+            return
         if low.startswith("[error]") or low.startswith("[exception]"):
             self.log("error", message)
         elif low.startswith("[warning]"):
@@ -626,6 +764,83 @@ class PartitionTab(QWidget):
             not part.drive_letter,
             status=f"Formatting partition {part.number} as {fs}"
                    f"{' (full format — this can take long)' if not quick else ''}…")
+
+    # -- Fix Fake Drive ---------------------------------------------------
+    def begin_fake_fix(self, payload: dict) -> None:
+        """Entry point from the Capacity Test FAILED result."""
+        if self._busy:
+            QMessageBox.information(
+                self, "Operation running",
+                "Another partition operation is still running. "
+                "Please wait.")
+            return
+        self.log("info", "Fix Fake Drive requested from Capacity "
+                         "Test.")
+        if not usb_utils.is_admin():
+            self.log("error", "Administrator privileges required — "
+                              "repair blocked.")
+            QMessageBox.warning(
+                self, "Administrator privileges required",
+                "Fix Fake Drive requires administrator privileges.\n\n"
+                "Close USB Fix Tool and restart it as administrator "
+                "(right-click → Run as administrator).")
+            return
+        fp = payload["fingerprint"]
+        ok, reason, fresh = partition_utils.verify_identity(fp)
+        if not ok:
+            self.log("error", f"USB identity verification failed — "
+                              f"repair aborted. {reason}")
+            QMessageBox.critical(
+                self, "Repair blocked",
+                "The original tested USB device could not be reliably "
+                f"identified. Repair has been blocked for safety.\n\n"
+                f"{reason}")
+            return
+        if fresh.is_readonly:
+            self.log("error", "Write-protected USB device detected — "
+                              "repair blocked.")
+            QMessageBox.warning(
+                self, "Write-protected device",
+                "The tested USB drive is write-protected. Remove the "
+                "protection switch and try again.")
+            return
+        self.log("success", "[ok] Original USB identity verified: "
+                            f"Disk {fresh.number} — {fresh.model} "
+                            f"(S/N {fresh.serial or 'n/a'}).")
+
+        # Select the verified disk in this tab's own device list.
+        self.refresh_disks()
+        idx = next((i for i, d in enumerate(self._disks)
+                    if d.number == fresh.number
+                    and d.serial == fresh.serial
+                    and d.size_bytes == fresh.size_bytes), -1)
+        if idx < 0:
+            self.log("error", "USB identity ambiguous after rescan — "
+                              "repair aborted.")
+            QMessageBox.critical(
+                self, "Repair blocked",
+                "The original tested USB device could not be reliably "
+                "identified. Repair has been blocked for safety.")
+            return
+        self.disk_combo.setCurrentIndex(idx)
+
+        dlg = FixFakeDriveDialog(self, self._current or fresh,
+                                 self._partitions, payload)
+        self.log("info", "Repair preview opened.")
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            self.log("info", "Repair cancelled by user from the "
+                             "preview.")
+            return
+        opts = dlg.options()
+        self.log("info", f"Repair confirmed by user: "
+                         f"{opts['size_mb']} MB, {opts['fs']}, "
+                         f"{'quick' if opts['quick'] else 'full'} "
+                         "format.")
+        self._start_op(
+            partition_utils.repair_fake_drive,
+            self._current or fresh, opts["size_mb"], opts["fs"],
+            opts["label"], opts["quick"],
+            status="Fix Fake Drive in progress…")
 
     # -- worker ---------------------------------------------------------
     def _start_op(self, fn, *args, status: str) -> None:

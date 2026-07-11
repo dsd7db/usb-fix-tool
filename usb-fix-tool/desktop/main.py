@@ -42,7 +42,7 @@ from repair_tab import RepairTab
 
 # Replace this with your real affiliate URL when publishing.
 AFFILIATE_URL = "https://example.com/recover?ref=usbfixtool"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.2.0"
 
 
 def _asset_path(name: str) -> str:
@@ -87,8 +87,14 @@ class MainWindow(QMainWindow):
             lambda busy: self._lock_tabs(busy, keep=1))
         self.repair_tab.busyChanged.connect(
             lambda busy: self._lock_tabs(busy, keep=2))
+        self.capacity_tab.fixFakeDriveRequested.connect(
+            self._on_fix_fake_drive)
 
         root.addWidget(self._build_footer())
+
+    def _on_fix_fake_drive(self, payload: dict) -> None:
+        self.tabs.setCurrentWidget(self.partition_tab)
+        self.partition_tab.begin_fake_fix(payload)
 
     def _lock_tabs(self, busy: bool, keep: int) -> None:
         for i in range(self.tabs.count()):
@@ -226,6 +232,15 @@ class MainWindow(QMainWindow):
             border: 1px solid #ecd393; border-radius: 4px;
             padding: 6px 8px; font-size: 11px;
         }
+        QLabel#dangerNote {
+            color: #a02015; background: #fdeae7;
+            border: 1px solid #f0b8b0; border-radius: 4px;
+            padding: 6px 8px; font-size: 12px; font-weight: 600;
+        }
+        QLabel#fakeInfo {
+            color: #a02015; font-weight: 600; font-size: 12px;
+        }
+        QDialog { background-color: #f0f2f5; }
 
         /* ---------- phase label -------------------------------------- */
         QLabel#phaseLabel {

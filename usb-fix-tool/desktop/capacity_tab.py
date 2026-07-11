@@ -37,6 +37,7 @@ from PySide6.QtWidgets import (
 )
 
 import storage_test
+import partition_utils
 import usb_utils
 from storage_test import fmt_bytes
 
@@ -104,11 +105,19 @@ class TestWorker(QObject):
 
 class CapacityTab(QWidget):
     testRunningChanged = Signal(bool)
+    fixFakeDriveRequested = Signal(dict)
+
+    # Fix Fake Drive is only offered when at least this much
+    # contiguous capacity was positively verified.
+    MIN_USABLE = 64 * MiB
 
     def __init__(self) -> None:
         super().__init__()
         self._target: Optional[str] = None
+        self._target_device = None            # UsbDevice from drive combo
         self._devices = []
+        self._session: Dict = {}              # per-test-run context
+        self._fix_payload: Optional[Dict] = None
         self._thread: Optional[QThread] = None
         self._worker: Optional[TestWorker] = None
         self._stop_event: Optional[threading.Event] = None
@@ -377,6 +386,35 @@ class CapacityTab(QWidget):
             cell.addWidget(val)
             grid.addLayout(cell, r, c)
         lay.addLayout(grid)
+
+        self.repair_note = QLabel(
+            "Automatic repair is unavailable because a reliable "
+            "contiguous usable capacity could not be verified.")
+        self.repair_note.setObjectName("noteText")
+        self.repair_note.setWordWrap(True)
+        self.repair_note.setVisible(False)
+        lay.addWidget(self.repair_note)
+
+        self.fake_row = QFrame()
+        frow = QHBoxLayout(self.fake_row)
+        frow.setContentsMargins(0, 4, 0, 0)
+        frow.setSpacing(10)
+        self.fake_label = QLabel("")
+        self.fake_label.setObjectName("fakeInfo")
+        self.fake_label.setWordWrap(True)
+        frow.addWidget(self.fake_label, stretch=1)
+        self.btn_details = QPushButton("View Details")
+        self.btn_details.clicked.connect(self._show_fix_details)
+        frow.addWidget(self.btn_details)
+        self.btn_fix = QPushButton("Fix Fake Drive")
+        self.btn_fix.setObjectName("primary")
+        self.btn_fix.setToolTip(
+            "Repartition this USB drive to its verified real usable "
+            "capacity (opens a preview first — nothing is erased yet)")
+        self.btn_fix.clicked.connect(self._request_fix)
+        frow.addWidget(self.btn_fix)
+        self.fake_row.setVisible(False)
+        lay.addWidget(self.fake_row)
         return frame
 
     def _build_log_panel(self) -> QWidget:
@@ -437,6 +475,7 @@ class CapacityTab(QWidget):
                 f"The path is not an accessible directory:\n{path}")
             return
         self._target = path
+        self._target_device = device
         self.target_label.setText(path)
         try:
             usage = shutil.disk_usage(path)
@@ -515,6 +554,10 @@ class CapacityTab(QWidget):
 
         self.result_panel.setVisible(False)
         self._set_running(True)
+        self._session = {
+            "mode_full": self.rb_full.isChecked(),
+            "fingerprint": self._resolve_fingerprint(),
+        }
         self.log("info", "Test started.")
         mode = ("Full capacity" if self.rb_full.isChecked() else
                 "Quick verification" if self.rb_quick.isChecked()
@@ -603,6 +646,9 @@ class CapacityTab(QWidget):
 
     def _show_result(self, r: Dict) -> None:
         status = r["status"]
+        self._fix_payload = None
+        self.fake_row.setVisible(False)
+        self.repair_note.setVisible(False)
         if status == "pass":
             self.result_panel.setProperty("state", "pass")
             self.result_title.setText(
@@ -635,8 +681,130 @@ class CapacityTab(QWidget):
         v["avgw"].setText(_fmt_speed(r.get("avg_write", 0)))
         v["avgr"].setText(_fmt_speed(r.get("avg_read", 0)))
         v["dur"].setText(_fmt_time(r.get("duration", -1)))
+        if status == "fail":
+            self._evaluate_fake_fix(r)
         self.result_panel.setVisible(True)
         self.hint_label.setText("Test finished.")
+
+    # -- Fix Fake Drive -----------------------------------------------
+    def _resolve_fingerprint(self):
+        """
+        Map the tested drive letter to a positively-identified
+        eligible removable USB flash disk. Returns None when the
+        target is a browsed folder or the physical disk cannot be
+        verified as an eligible USB flash drive.
+        """
+        if os.name != "nt" or self._target_device is None:
+            return None
+        disk_no = usb_utils.disk_number_for_letter(
+            self._target_device.drive_letter)
+        if disk_no is None:
+            return None
+        disks, _ = partition_utils.list_usb_disks()
+        return next((d for d in disks
+                     if d.number == disk_no and d.eligible), None)
+
+    def _evaluate_fake_fix(self, r: Dict) -> None:
+        verify_errors = r.get("verify_errors", 0)
+        write_errors = r.get("write_errors", 0)
+        feo = r.get("first_error_offset", -1)
+        if verify_errors > 0 and feo >= 0:
+            usable = feo
+        elif write_errors > 0 and verify_errors == 0:
+            # write hit a hard wall; everything written verified OK
+            usable = r.get("verified_ok", 0)
+        else:
+            usable = -1
+
+        fp = self._session.get("fingerprint")
+        reason = ""
+        if usable < self.MIN_USABLE:
+            reason = ("no meaningful contiguous usable capacity was "
+                      "verified")
+        elif fp is None:
+            reason = ("the target could not be positively identified "
+                      "as an eligible removable USB flash drive")
+        elif not self._session.get("mode_full"):
+            reason = ("only a Full capacity test can establish the "
+                      "contiguous usable capacity of the whole drive")
+        if reason:
+            self.repair_note.setVisible(True)
+            self.log("warning", "Reliable contiguous capacity "
+                                "unavailable; automatic repair "
+                                f"disabled ({reason}).")
+            return
+
+        # Conservative safety margin below the verified boundary:
+        # max(64 MiB, 1% of verified capacity), floored to whole MiB.
+        margin = max(64 * MiB, usable // 100)
+        safe = ((usable - margin) // MiB) * MiB
+        if safe < self.MIN_USABLE:
+            self.repair_note.setVisible(True)
+            self.log("warning", "Reliable contiguous capacity "
+                                "unavailable; automatic repair "
+                                "disabled (safe capacity below "
+                                "minimum after margin).")
+            return
+
+        self.log("error", "Fake capacity detected: data corruption "
+                          f"begins at offset {fmt_bytes(usable)}.")
+        self.log("info", f"Verified usable capacity calculated: "
+                         f"{fmt_bytes(usable)}.")
+        self.log("info", f"Safe repair size calculated: "
+                         f"{fmt_bytes(safe)} (safety margin "
+                         f"{fmt_bytes(margin)}).")
+        self._fix_payload = {
+            "fingerprint": fp,
+            "advertised": fp.size_bytes,
+            "tested": r.get("tested_bytes", 0),
+            "usable": usable,
+            "margin": margin,
+            "safe": safe,
+            "corrupted": r.get("lost_bytes", 0),
+            "verify_errors": verify_errors,
+            "write_errors": write_errors,
+        }
+        self.fake_label.setText(
+            f"FAKE CAPACITY DETECTED on {fp.model} (Disk "
+            f"{fp.number}) — advertised {fmt_bytes(fp.size_bytes)}, "
+            f"verified usable {fmt_bytes(usable)}, recommended safe "
+            f"partition {fmt_bytes(safe)}.")
+        self.fake_row.setVisible(True)
+
+    def _show_fix_details(self) -> None:
+        p = self._fix_payload
+        if not p:
+            return
+        fp = p["fingerprint"]
+        QMessageBox.information(
+            self, "Fake capacity details",
+            "Result: FAKE CAPACITY DETECTED\n\n"
+            f"USB device:            {fp.model}\n"
+            f"Physical disk:         Disk {fp.number} "
+            f"(S/N {fp.serial or 'n/a'})\n"
+            f"Advertised capacity:   {fmt_bytes(p['advertised'])}\n"
+            f"Tested capacity:       {fmt_bytes(p['tested'])}\n"
+            f"Verified usable:       {fmt_bytes(p['usable'])}\n"
+            f"Corrupted / invalid:   {fmt_bytes(p['corrupted'])}\n"
+            f"Verification errors:   {p['verify_errors']}\n"
+            f"Write errors:          {p['write_errors']}\n\n"
+            f"Safety margin:         {fmt_bytes(p['margin'])}\n"
+            f"Recommended safe size: {fmt_bytes(p['safe'])}\n\n"
+            "The verified usable capacity is the contiguous region "
+            "from the start of the tested storage that read back "
+            "byte-for-byte intact.")
+
+    def _request_fix(self) -> None:
+        if not self._fix_payload:
+            return
+        if self._running:
+            QMessageBox.information(
+                self, "Test running",
+                "Wait for the running test to finish first.")
+            return
+        self.log("info", "Fix Fake Drive requested — verifying the "
+                         "original USB device...")
+        self.fixFakeDriveRequested.emit(dict(self._fix_payload))
 
     # -- state helpers ----------------------------------------------------
     def _set_phase(self, phase: str) -> None:

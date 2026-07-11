@@ -18,6 +18,22 @@ built with **PySide6**.
 - Test files are written to free space only and deleted afterwards —
   existing files are never touched
 
+### Fix Fake Drive (v2.2)
+- A FAILED Full-capacity test on a verified removable USB flash
+  drive offers a one-click **Fix Fake Drive** action
+- The verified contiguous usable capacity comes only from the real
+  test result (first corruption offset); advertised capacity is
+  never used
+- A conservative safety margin (max of 64 MiB / 1%) is applied and
+  both values are shown; the user can only reduce the size
+- Full repair preview (device identity, capacities, partitions to be
+  deleted, final layout) with explicit confirmation before anything
+  is erased
+- Multi-step repair (verify identity → delete partitions → create
+  safe partition → format) with real step-based progress; identity
+  is re-verified before every destructive step; partial failures are
+  reported honestly with recovery guidance
+
 ### USB Partition Management (v2.1)
 - Exclusively for positively-identified **removable USB flash
   drives** — internal HDD/SSD/NVMe, boot/system disks, SD bus and

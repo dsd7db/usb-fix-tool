@@ -111,6 +111,34 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   "How to Detect Fake USB Drives", blog index + sitemap updated.
 - ✅ v2.1.0; ZIP repackaged and download verified (HTTP 200).
 
+## What's been implemented (Jun 2026) — v2.2 Fix Fake Drive
+- ✅ Engine tracks `first_error_offset` (lowest corrupted/truncated/
+  unreadable offset) → verified contiguous usable capacity.
+- ✅ FAILED Full-capacity test on a fingerprinted eligible USB drive
+  shows "FAKE CAPACITY DETECTED" row in the result panel with
+  advertised/verified/recommended-safe values + [Fix Fake Drive]
+  [View Details]. Unavailable cases (browsed folder target, non-full
+  mode, no meaningful usable capacity) show the exact "automatic
+  repair is unavailable" note and log reason.
+- ✅ Safety margin: max(64 MiB, 1% of verified), documented in code.
+- ✅ Fingerprint captured at test start (drive letter → physical disk
+  via partition_utils, eligible USB only); identity re-verified on
+  Fix click, again on tab handoff, and again inside every destructive
+  sub-step (reuses v2.1 verify_identity/_pre_check).
+- ✅ FixFakeDriveDialog preview: device identity, capacities, margin,
+  partitions to delete, final layout, size reducible only (max =
+  safe), FS/label/quick-full, FAT32>32GB gating, confirm checkbox
+  required before "Erase & Repair Drive".
+- ✅ `partition_utils.repair_fake_drive()` 7-step orchestrator
+  (reuses delete/create/format), step-based status (no fake %),
+  partial-failure codes with recovery guidance, protected-partition
+  and identity-change aborts.
+- ✅ Tests: engine first_error_offset (real corrupted run);
+  orchestrator success/partial/protected/identity-swap paths with
+  simulated PS+diskpart; full UI E2E offscreen (fail panel → preview
+  dialog gating → repair → final refreshed state). Capacity-test
+  regression PASS. v2.2.0, ZIP repackaged (HTTP 200).
+
 ## Prioritized backlog
 - **P0** — none (all spec items shipped).
 - **P1** — replace placeholder URLs (canonical, affiliate, AdSense
