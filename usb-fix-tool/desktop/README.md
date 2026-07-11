@@ -18,6 +18,23 @@ built with **PySide6**.
 - Test files are written to free space only and deleted afterwards —
   existing files are never touched
 
+### USB Partition Management (v2.1)
+- Exclusively for positively-identified **removable USB flash
+  drives** — internal HDD/SSD/NVMe, boot/system disks, SD bus and
+  virtual disks are never listed and are blocked again at execution
+  time (Get-Disk BusType + Win32_DiskDrive cross-check, removable
+  media, VID/PID, serial, model, capacity)
+- Inspect real partition layout, delete partitions, view unallocated
+  space, create partitions (max or custom size), format
+  (FAT32 ≤32 GB / exFAT / NTFS, quick or full)
+- USB identity is re-verified in the backend immediately before every
+  destructive operation; identity change or ambiguity aborts the
+  operation
+- Real diskpart output is scanned for failure markers — success is
+  never reported after an access-denied / VDS error
+- Protected partitions (System/EFI/Recovery/Reserved) cannot be
+  deleted or formatted; write-protected drives are blocked
+
 ### Repair Tools
 - Detect connected USB drives (drive letter, label, file system, size)
 - Run **CHKDSK** repair (`/F /R /X`)

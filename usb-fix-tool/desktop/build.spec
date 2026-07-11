@@ -48,7 +48,7 @@ exe = EXE(
     upx=False,            # UPX-packed binaries get flagged by AVs
     console=False,
     uac_admin=True,       # request administrator rights via UAC
-    icon=None,
+    icon='assets/app.ico',
 )
 
 coll = COLLECT(

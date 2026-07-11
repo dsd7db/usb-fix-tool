@@ -23,7 +23,7 @@ import webbrowser
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QFrame,
@@ -37,11 +37,12 @@ from PySide6.QtWidgets import (
 )
 
 from capacity_tab import CapacityTab
+from partition_tab import PartitionTab
 from repair_tab import RepairTab
 
 # Replace this with your real affiliate URL when publishing.
 AFFILIATE_URL = "https://example.com/recover?ref=usbfixtool"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.1.0"
 
 
 def _asset_path(name: str) -> str:
@@ -53,6 +54,7 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle(f"USB Fix Tool  v{APP_VERSION}")
+        self.setWindowIcon(QIcon(_asset_path("app.png")))
         self.resize(1020, 820)
         self.setMinimumSize(820, 780)
         self._build_ui()
@@ -70,19 +72,28 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.setDocumentMode(True)
         self.capacity_tab = CapacityTab()
+        self.partition_tab = PartitionTab()
         self.repair_tab = RepairTab()
         self.tabs.addTab(self.capacity_tab, "Capacity Test")
+        self.tabs.addTab(self.partition_tab, "USB Partitions")
         self.tabs.addTab(self.repair_tab, "Repair Tools")
         root.addWidget(self.tabs, stretch=1)
 
-        # Lock the opposite tab while an operation runs to avoid
+        # Lock the other tabs while an operation runs to avoid
         # conflicting disk operations.
         self.capacity_tab.testRunningChanged.connect(
-            lambda running: self.tabs.setTabEnabled(1, not running))
+            lambda busy: self._lock_tabs(busy, keep=0))
+        self.partition_tab.busyChanged.connect(
+            lambda busy: self._lock_tabs(busy, keep=1))
         self.repair_tab.busyChanged.connect(
-            lambda busy: self.tabs.setTabEnabled(0, not busy))
+            lambda busy: self._lock_tabs(busy, keep=2))
 
         root.addWidget(self._build_footer())
+
+    def _lock_tabs(self, busy: bool, keep: int) -> None:
+        for i in range(self.tabs.count()):
+            if i != keep:
+                self.tabs.setTabEnabled(i, not busy)
 
     def _build_header(self) -> QWidget:
         bar = QFrame()
@@ -100,9 +111,9 @@ class MainWindow(QMainWindow):
         title = QLabel("USB Fix Tool")
         title.setObjectName("appTitle")
         title.setFont(QFont("Segoe UI", 14, QFont.Weight.DemiBold))
-        subtitle = QLabel("Verify real storage capacity and detect "
-                          "data errors on USB drives, SD cards and "
-                          "external disks.")
+        subtitle = QLabel("Verify real storage capacity, manage USB "
+                          "partitions and repair USB drives, SD cards "
+                          "and external disks.")
         subtitle.setObjectName("appSubtitle")
         col.addWidget(title)
         col.addWidget(subtitle)
@@ -210,6 +221,11 @@ class MainWindow(QMainWindow):
         }
         QLabel#noteText { color: #8a93a3; font-size: 11px; }
         QLabel#hintText { color: #5a6472; font-size: 12px; }
+        QLabel#adminNote {
+            color: #7a5200; background: #fdf3d7;
+            border: 1px solid #ecd393; border-radius: 4px;
+            padding: 6px 8px; font-size: 11px;
+        }
 
         /* ---------- phase label -------------------------------------- */
         QLabel#phaseLabel {

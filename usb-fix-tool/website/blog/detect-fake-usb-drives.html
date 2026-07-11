@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>How to Detect Fake USB Drives — Test Real Capacity Free (2026)</title>
+<meta name="description" content="Bought a suspiciously cheap 1 TB USB stick? Learn how counterfeit flash drives fake their capacity and how to expose them in minutes with a free write-and-verify capacity test.">
+<meta name="keywords" content="detect fake usb drive, fake capacity usb, usb capacity test, h2testw alternative, counterfeit flash drive test, verify usb real capacity">
+<link rel="canonical" href="https://example.com/blog/detect-fake-usb-drives.html" />
+<link rel="icon" type="image/png" href="../assets/favicon.png" />
+
+<meta property="og:type" content="article" />
+<meta property="og:title" content="How to Detect Fake USB Drives (Free Capacity Test)" />
+<meta property="og:description" content="Counterfeit USB sticks lie about their size. Expose them in minutes with a free write-and-verify capacity test." />
+<meta property="og:image" content="https://example.com/assets/og-cover.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/style.css" />
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to detect a fake-capacity USB drive",
+  "step": [
+    {"@type": "HowToStep", "name": "Back up and empty the drive"},
+    {"@type": "HowToStep", "name": "Run a full write-and-verify capacity test"},
+    {"@type": "HowToStep", "name": "Read the PASS/FAIL verification result"},
+    {"@type": "HowToStep", "name": "Reclaim the real capacity or return the drive"}
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="nav">
+    <a class="brand" href="../index.html">USB Fix Tool<span class="dot">.</span></a>
+    <nav class="nav-links">
+      <a href="../index.html">Home</a>
+      <a href="../download.html">Download</a>
+      <a href="../blog.html">Blog</a>
+    </nav>
+  </div>
+</header>
+
+<article class="article">
+  <header>
+    <span class="post-meta">Buyer protection · 9 min read</span>
+    <h1>How to Detect Fake USB Drives (Free Capacity Test)</h1>
+    <p class="muted">
+      A "2 TB" USB stick for $12 is not a bargain — it's a
+      counterfeit. The controller has been reprogrammed to
+      <strong>lie about its capacity</strong>, and the drive will
+      silently destroy your files the moment you exceed the real
+      flash inside. Here's how the scam works and how to expose it
+      in minutes, for free.
+    </p>
+  </header>
+
+  <div class="ad-slot" aria-label="Advertisement">
+    Ad slot — 728×90
+    <small>Replace with AdSense unit when ready</small>
+  </div>
+
+  <h2>How fake-capacity USB drives work</h2>
+
+  <p>
+    Every USB flash drive has a small controller chip that tells the
+    operating system how big the drive is. Counterfeiters buy cheap
+    4–16 GB flash chips, then reflash the controller firmware so it
+    <em>reports</em> 256 GB, 512 GB, 1 TB — whatever the listing
+    promises. Windows believes the controller, shows the fake size in
+    Explorer, and even lets you "copy" hundreds of gigabytes onto the
+    drive.
+  </p>
+
+  <p>The deception falls apart in one of two ugly ways:</p>
+
+  <ol>
+    <li><strong>Wrap-around writes.</strong> Once the real flash is
+        full, the controller starts writing new data <em>over the
+        top of your old files</em>, starting from the beginning. The
+        file names all still appear in Explorer — but the contents
+        are gone. You discover it weeks later, when you try to open
+        the photos.</li>
+    <li><strong>Discarded writes.</strong> Cheaper fakes simply throw
+        the extra data away. Copying "succeeds", but reading the file
+        back returns garbage or an I/O error.</li>
+  </ol>
+
+  <p>
+    Either way, the drive looks perfectly healthy until the exact
+    moment you rely on it. That's why every suspicious drive should
+    be tested <strong>before</strong> you trust it with real data.
+  </p>
+
+  <h2>Red flags before you even test</h2>
+
+  <ul>
+    <li><strong>Price too good to be true.</strong> Legitimate 1 TB
+        flash media costs many times more than the $9–$15 marketplace
+        listings. There is no "factory surplus" of 2 TB sticks.</li>
+    <li><strong>Unknown brand + huge capacity.</strong> 512 GB and up
+        from a brand you've never heard of is the classic combo.</li>
+    <li><strong>Suspicious speed.</strong> Fake drives are usually
+        built from the slowest flash available. If a "USB 3.2" drive
+        writes at 4 MB/s, be suspicious.</li>
+    <li><strong>Capacity that's exactly a round marketing number.</strong>
+        Real drives show slightly less than the label (a 64 GB stick
+        shows ~57.5 GiB). Some fakes report the marketing number
+        exactly.</li>
+  </ul>
+
+  <p>
+    Red flags are hints. The only <em>proof</em> is a full
+    write-and-verify test.
+  </p>
+
+  <h2>The only reliable test: write everything, read everything back</h2>
+
+  <p>
+    A capacity test works like this: the tool fills the drive's free
+    space with files of known, unique test data, forces the data out
+    of the cache and onto the actual flash, then reads every byte
+    back and compares it against what was written. On a genuine drive
+    every byte matches. On a fake, the verification phase finds
+    mismatched data exactly where the real flash ran out — and the
+    test tells you the drive's <strong>true usable capacity</strong>.
+  </p>
+
+  <p>
+    This is the method made famous by the German utility
+    <strong>H2testw</strong>, and it remains the gold standard because
+    it can't be fooled: the controller can lie to Windows about its
+    size, but it can't fake data it never stored.
+  </p>
+
+  <h2>Step-by-step: test a suspicious USB drive with USB Fix Tool</h2>
+
+  <p>
+    <a href="../download.html">USB Fix Tool</a> (free) includes a
+    modern H2testw-style <strong>Capacity Test</strong> with live
+    progress, real write/read speeds and a clear PASS/FAIL verdict.
+  </p>
+
+  <ol>
+    <li><strong>Back up anything on the drive.</strong> The test only
+        writes to free space and deletes its test files afterwards,
+        but a suspicious drive shouldn't hold your only copy of
+        anything.</li>
+    <li><strong>Open USB Fix Tool → Capacity Test tab.</strong>
+        Select the drive under <em>Target Device</em>. The panel
+        shows the reported file system, total, used and free
+        space.</li>
+    <li><strong>Choose "Full capacity test".</strong> This writes and
+        verifies all free space — the only mode that can expose the
+        full extent of a fake. (A quick 1 GB sample is fine for a
+        first sanity check, but a fake 1 TB stick with 16 GB of real
+        flash will pass a 1 GB test.)</li>
+    <li><strong>Press Start Test and wait.</strong> The activity log
+        shows every phase; the progress panel shows data written,
+        data verified, live speeds and detected errors. A full test
+        of a large drive can take hours — that's normal, it has to
+        physically write every byte.</li>
+    <li><strong>Read the verdict.</strong>
+        <ul>
+          <li><strong style="color:#2f9e57">PASS</strong> — every
+              byte written was read back intact. The capacity is
+              real.</li>
+          <li><strong style="color:#e5534b">FAIL</strong> — corrupted
+              data was detected. The results panel shows the verified
+              capacity (the drive's real size) versus the lost /
+              corrupted portion (the fake part).</li>
+        </ul>
+    </li>
+  </ol>
+
+  <h2>Interpreting a FAIL result</h2>
+
+  <p>
+    Suppose you tested a "512 GB" stick and got:
+    <em>verified 29.7 GB, lost/corrupted 448 GB</em>. That tells you
+    the drive contains roughly 32 GB of real flash. You now have two
+    options:
+  </p>
+
+  <ul>
+    <li><strong>Return it and report the listing.</strong> A
+        fake-capacity drive is fraud in most jurisdictions, and
+        marketplaces refund these readily when you include the test
+        result.</li>
+    <li><strong>Shrink it to its real size and keep using it.</strong>
+        If a refund isn't possible, you can make the drive safe by
+        re-partitioning it to its true capacity: delete the
+        partition, create a new one no larger than the verified size,
+        and format it. USB Fix Tool's <em>USB Partitions</em> tab
+        does exactly this — it works only on removable USB flash
+        drives, so you can't accidentally touch an internal disk.
+        Re-test afterwards to confirm the new partition passes.</li>
+  </ul>
+
+  <h2>Why not just copy a big folder onto the drive?</h2>
+
+  <p>
+    Because Windows caches writes and fakes often keep file
+    <em>names</em> intact while destroying file <em>contents</em>. A
+    copy that "succeeds" proves nothing — you'd have to reopen and
+    binary-compare every file to be sure. A proper capacity test does
+    that comparison automatically with unique, per-block test
+    patterns, forces real flushes to the flash (so the cache can't
+    hide anything), and counts every corrupted byte.
+  </p>
+
+  <div class="ad-slot" aria-label="Advertisement">
+    Ad slot — 728×90
+    <small>Replace with AdSense unit when ready</small>
+  </div>
+
+  <h2>Frequently asked questions</h2>
+
+  <h3>How long does a full capacity test take?</h3>
+  <p>
+    Total time ≈ drive size ÷ write speed + drive size ÷ read speed.
+    A genuine 64 GB USB 3 stick writing at 60 MB/s and reading at
+    120 MB/s takes about 27 minutes. Ironically, fakes often fail
+    much faster maths: they're built from slow flash, so a "1 TB"
+    fake writing at 5 MB/s would take days — one more reason to stop
+    the test and demand a refund once errors appear.
+  </p>
+
+  <h3>Will the test erase my files?</h3>
+  <p>
+    No. The test writes its own files to <em>free space only</em> and
+    deletes them afterwards. Existing files are never modified. Even
+    so, always back up first — a counterfeit drive can corrupt
+    neighbouring data all by itself.
+  </p>
+
+  <h3>Is a quick 1 GB test enough?</h3>
+  <p>
+    Only as a first smoke test. Fakes typically contain 8–32 GB of
+    real flash, so small writes land on genuine storage and verify
+    fine. To prove capacity you must fill the drive —
+    that's the point where the controller runs out of real flash and
+    starts corrupting data.
+  </p>
+
+  <h3>My drive failed the test. Can I get my money back?</h3>
+  <p>
+    Usually yes. Screenshot the FAIL result panel (it shows tested,
+    verified and lost capacity) and open a "item not as described"
+    claim. Marketplaces resolve fake-capacity claims quickly because
+    the evidence is unambiguous.</p>
+
+  <h3>Can a fake drive be "fixed" to full size?</h3>
+  <p>
+    No. The flash chips physically hold only what they hold — no
+    software can add storage. Re-partitioning to the verified real
+    size makes the drive honest and safe, but it will never hold
+    more than the flash inside it.
+  </p>
+
+  <h3>Does this work for SD cards and external SSDs too?</h3>
+  <p>
+    Yes — the write-and-verify method works on any storage that
+    mounts with a drive letter or folder. Counterfeit microSD cards
+    are at least as common as fake USB sticks, and external
+    "portable SSDs" with fake capacity have flooded marketplaces
+    since 2023.
+  </p>
+
+  <section>
+    <div class="container" style="padding:0">
+      <div class="affiliate-box">
+        <div>
+          <h3>Already lost files to a fake drive?</h3>
+          <p>
+            If a counterfeit stick corrupted your photos or documents,
+            dedicated recovery software can sometimes restore what the
+            controller didn't physically overwrite.
+          </p>
+        </div>
+        <a class="btn btn-affiliate" href="https://example.com/recover?ref=usbfixtool" target="_blank" rel="nofollow sponsored noopener">
+          Recover lost files →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+  <p class="muted" style="font-size:14px">
+    Last updated · June 2026
+  </p>
+</article>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>© 2026 USB Fix Tool — free for personal use.</div>
+    <div>
+      <a href="../index.html">Home</a> &nbsp;·&nbsp;
+      <a href="../download.html">Download</a> &nbsp;·&nbsp;
+      <a href="../blog.html">Blog</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../js/main.js"></script>
+</body>
+</html>

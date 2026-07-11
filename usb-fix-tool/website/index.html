@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>USB Fix Tool — Fix USB Drive Not Recognized in Minutes (Free)</title>
-<meta name="description" content="Free Windows tool to repair USB drives that are not recognized, show 0 bytes, or appear as RAW. Run CHKDSK, format and rebuild partitions in one click.">
-<meta name="keywords" content="usb fix tool, usb not recognized, repair usb drive, fix raw usb, usb 0 bytes fix, format flash drive">
+<title>USB Fix Tool — Test Real USB Capacity &amp; Fix Broken Drives (Free)</title>
+<meta name="description" content="Free Windows tool to verify real USB capacity (detect fake drives), repair drives that are not recognized, show 0 bytes or appear as RAW, and manage USB partitions safely.">
+<meta name="keywords" content="usb fix tool, usb capacity test, detect fake usb, usb not recognized, repair usb drive, fix raw usb, usb partition manager, format flash drive">
 <link rel="canonical" href="https://example.com/" />
+<link rel="icon" type="image/png" href="assets/favicon.png" />
 
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
@@ -67,12 +68,14 @@
 <main>
   <section class="hero">
     <div class="container">
-      <span class="eyebrow">Free for Windows</span>
-      <h1>Fix USB drive <span class="accent">not recognized</span> in minutes.</h1>
+      <span class="eyebrow">Free for Windows · v2.1</span>
+      <h1>Test <span class="accent">real capacity</span>. Fix broken USB drives.</h1>
       <p class="lead">
-        A small, transparent utility that runs Windows' own repair commands —
-        CHKDSK, format and diskpart — behind a clean dark interface. Detect
-        a broken USB, run the right fix, and watch the log live.
+        A transparent utility that verifies your drive's true capacity
+        with an H2testw-style write-and-verify test, exposes fake
+        drives with a clear PASS/FAIL verdict, manages USB partitions
+        safely, and runs Windows' own repair commands — CHKDSK, format
+        and diskpart — behind a clean professional interface.
       </p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="download.html">↓ Download free tool</a>
@@ -85,18 +88,29 @@
     <div class="container">
       <h2>What it does</h2>
       <p class="section-lead">
-        Built for stuck USB sticks, write-protected drives, RAW partitions and
-        flash drives that suddenly show 0 bytes. No bloat, no telemetry.
+        Built for suspicious marketplace drives, stuck USB sticks,
+        RAW partitions and flash drives that suddenly show 0 bytes.
+        No bloat, no telemetry.
       </p>
 
       <div class="grid">
+        <div class="card">
+          <div class="icon">✓</div>
+          <h3>Real capacity test (PASS/FAIL)</h3>
+          <p>Writes and verifies every byte to expose fake-capacity drives — live speeds, error counts and a clear verdict.</p>
+        </div>
+        <div class="card">
+          <div class="icon">◫</div>
+          <h3>USB partition manager</h3>
+          <p>Inspect, delete, create and format partitions — locked to removable USB flash drives only, never your internal disks.</p>
+        </div>
         <div class="card">
           <div class="icon">▣</div>
           <h3>Detect drives instantly</h3>
           <p>Lists every removable drive with letter, label, file system and capacity.</p>
         </div>
         <div class="card">
-          <div class="icon">✓</div>
+          <div class="icon">⚒</div>
           <h3>Run CHKDSK</h3>
           <p>Repairs filesystem errors and recovers readable data with one click.</p>
         </div>
@@ -109,16 +123,6 @@
           <div class="icon">⚙</div>
           <h3>Advanced repair (diskpart)</h3>
           <p>Cleans the disk and rebuilds the partition table for severely broken sticks.</p>
-        </div>
-        <div class="card">
-          <div class="icon">A:</div>
-          <h3>Assign drive letter</h3>
-          <p>Fix drives that mount without a letter or collide with mapped network paths.</p>
-        </div>
-        <div class="card">
-          <div class="icon">▤</div>
-          <h3>Live log console</h3>
-          <p>Every command and its output is shown in real time — nothing hidden.</p>
         </div>
       </div>
     </div>
@@ -179,6 +183,11 @@
     <div class="container">
       <h2>Latest from the blog</h2>
       <ul class="post-list">
+        <li><a href="blog/detect-fake-usb-drives.html">
+          <span class="post-meta">Buyer protection</span>
+          <h3>How to Detect Fake USB Drives (Free Capacity Test)</h3>
+          <p>Counterfeit sticks lie about their size. Expose them in minutes with a write-and-verify test.</p>
+        </a></li>
         <li><a href="blog/usb-not-recognized-fix.html">
           <span class="post-meta">Step-by-step</span>
           <h3>USB Not Recognized Fix (Step-by-Step Guide)</h3>

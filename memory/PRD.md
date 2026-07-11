@@ -17,6 +17,15 @@ monetization integration, (4) 5 SEO blog articles for traffic.
     real speeds/ETA/error counters, auto-cleanup of test files).
   - `repair_tab.py`: original repair tools (chkdsk, format, diskpart,
     assign letter) on background QThread.
+  - `partition_utils.py` + `partition_tab.py` (v2.1): USB-flash-drive-
+    only partition management. Detection: Get-Disk (BusType USB) cross-
+    checked with Win32_DiskDrive (InterfaceType USB, removable media,
+    VID/PID); boot/system disks, SD bus, non-removable and ambiguous
+    devices blocked. Identity (serial/model/size/PNP) re-verified in
+    backend before every destructive op. Delete/Create (max|custom)/
+    Format (FAT32≤32GB, exFAT, NTFS; quick|full) via diskpart with
+    output failure-marker scanning. Protected partitions and write-
+    protected/read-only drives blocked. Admin required.
   PyInstaller spec for `.exe` build.
 - **Website** (`/app/usb-fix-tool/website/`): Pure static HTML/CSS/JS.
   No build step. Deployable to Netlify / Vercel / GitHub Pages /
@@ -81,6 +90,26 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   validated via offscreen Qt screenshots (initial, target selected,
   running, PASS, FAIL, repair tab). ZIP repackaged at
   `/app/frontend/public/usb-fix-tool.zip` (HTTP 200 verified).
+
+## What's been implemented (Jun 2026) — v2.1 Partition Management + carry-overs
+- ✅ USB Partition Management tab (3rd tab): select USB → inspect real
+  layout → delete partition → view unallocated → create (max/custom)
+  → format → refreshed real state. Exclusively for verified removable
+  USB flash drives; multi-property identity re-verified in backend
+  immediately before every destructive op; never relies on drive
+  letters; diskpart output scanned for failure markers (no fake
+  success); specific errors (write-protect, FAT32>32GB, insufficient
+  space, invalid partition, admin required, identity changed,
+  disconnected). Backend logic tested with simulated PowerShell
+  payloads (eligibility, blocking, identity mismatch/disconnect
+  aborts); UI states validated via offscreen screenshots.
+- ✅ Three-way tab locking during any running operation.
+- ✅ App icon: generated app.ico/app.png, wired into window +
+  PyInstaller build.spec.
+- ✅ Website: og-cover.png + favicon on all pages, homepage copy
+  updated (capacity test + partition manager), 6th SEO article
+  "How to Detect Fake USB Drives", blog index + sitemap updated.
+- ✅ v2.1.0; ZIP repackaged and download verified (HTTP 200).
 
 ## Prioritized backlog
 - **P0** — none (all spec items shipped).
