@@ -1,25 +1,39 @@
 # USB Fix Tool — Desktop App
 
-Lightweight Windows USB repair utility built with **PySide6**.
-Wraps standard Windows commands (`chkdsk`, `format`, `diskpart`)
-behind a simple dark UI.
+Professional storage verification & repair utility for Windows,
+built with **PySide6**.
 
 ## Features
 
+### Capacity Test (H2testw-style, v2.0)
+- Real write + verify testing: fills the target with deterministic
+  test data, fsyncs, reads it back and compares byte-for-byte
+- Detects **fake capacity**, corrupted sectors and read/write errors
+- Test modes: **Full capacity**, **Custom size**, **Quick (1 GB sample)**
+- Live progress: phase, %, data written/verified, real write/read
+  speeds, elapsed & estimated remaining time, error counters
+- Color-coded timestamped activity log
+- Clear **PASS / FAIL** result panel with tested/verified/lost
+  capacity, error counts, average speeds and duration
+- Test files are written to free space only and deleted afterwards —
+  existing files are never touched
+
+### Repair Tools
 - Detect connected USB drives (drive letter, label, file system, size)
 - Run **CHKDSK** repair (`/F /R /X`)
 - **Format** as FAT32 / exFAT / NTFS with custom label
 - **Advanced repair** — clean disk + create partition + format (diskpart)
 - **Assign drive letter**
 - Live log console of every command
-- "Recover Lost Files" button → external recovery-software page
+- "Recover Lost Files" link → external recovery-software page
 
 ## Safety
 
 - The app refuses destructive actions until you tick the confirmation
   checkbox **and** confirm a second dialog.
-- It must be run as administrator. The UAC prompt appears automatically
-  when launching the built `.exe`.
+- Stopping a running capacity test asks for confirmation.
+- Repair actions must be run as administrator. The UAC prompt appears
+  automatically when launching the built `.exe`.
 
 ## Run from source
 

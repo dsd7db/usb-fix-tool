@@ -7,9 +7,17 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 
 ## Architecture
 - **Desktop app** (`/app/usb-fix-tool/desktop/`): Python 3 + PySide6.
-  Wraps Windows commands (`chkdsk`, `format`, `diskpart`,
-  `Get-CimInstance`) in a dark Qt UI. Background QThread for
-  non-blocking command execution. PyInstaller spec for `.exe` build.
+  v2.0 — tabbed professional light-theme utility:
+  - `main.py`: window, header/footer, tabs, light QSS theme.
+  - `capacity_tab.py`: H2testw-style Capacity Test tab (target
+    selection, Full/Custom/Quick modes, live progress, color-coded
+    log, PASS/FAIL result panel).
+  - `storage_test.py`: real write+verify engine (1 MiB blocks of
+    64-bit offset counters, 1 GiB files, fsync, byte-for-byte verify,
+    real speeds/ETA/error counters, auto-cleanup of test files).
+  - `repair_tab.py`: original repair tools (chkdsk, format, diskpart,
+    assign letter) on background QThread.
+  PyInstaller spec for `.exe` build.
 - **Website** (`/app/usb-fix-tool/website/`): Pure static HTML/CSS/JS.
   No build step. Deployable to Netlify / Vercel / GitHub Pages /
   Cloudflare Pages.
@@ -51,6 +59,28 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   instructions and placeholder swap-list.
 - ✅ Lint-clean Python; HTML/CSS rendering verified via screenshots
   (home, download, blog article).
+
+## What's been implemented (Jun 2026) — v2.0 Capacity Test upgrade
+- ✅ Real H2testw-style storage verification engine
+  (`storage_test.py`): write + fsync + read-back verify with
+  deterministic offset-counter pattern; detects fake capacity,
+  truncated files, corrupted blocks, read/write errors; real
+  measured speeds, ETA, auto-delete of test files.
+- ✅ New "Capacity Test" main tab: target device panel (drive combo
+  on Windows + folder browse), Full / Custom-size / Quick-1GB modes,
+  Start/Stop/Clear controls with confirmation + validation, live
+  progress (phase badge, % bar, written/verified/remaining, speeds,
+  elapsed/remaining time, error counter), timestamped color-coded
+  activity log, prominent green PASS / red FAIL / amber STOPPED
+  result panel with full stats.
+- ✅ Repair tools preserved unchanged in a second tab; opposite tab
+  locked while an operation runs (no conflicting disk ops).
+- ✅ Full light professional theme (neutral gray bg, white panels,
+  blue primary, green/red/amber states, monospace diagnostics).
+- ✅ Engine unit-tested (PASS / corrupted-FAIL / STOP cases) and UI
+  validated via offscreen Qt screenshots (initial, target selected,
+  running, PASS, FAIL, repair tab). ZIP repackaged at
+  `/app/frontend/public/usb-fix-tool.zip` (HTTP 200 verified).
 
 ## Prioritized backlog
 - **P0** — none (all spec items shipped).
