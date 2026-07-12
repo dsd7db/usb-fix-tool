@@ -165,6 +165,25 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   and content-verified. Capacity + fix-fake regressions PASS.
   v2.3.0, ZIP repackaged (HTTP 200).
 
+## v2.3 Finalization & Regression Verification (Jun 2026)
+- ✅ Persistent regression suite created at
+  `/app/usb-fix-tool/desktop/tests/` (6 stages, run_all.sh, headless
+  offscreen; ~1 min).
+- ✅ Independent testing-agent verification
+  (`/app/test_reports/iteration_1.json`): 100% pass across all 6
+  stages; single StorageTester engine confirmed (no duplicate test
+  logic); certificate gating verified (only genuine reverify PASS);
+  report privacy (masked serial, SHA-256 fingerprint, UFT- IDs,
+  disclaimer) verified; ZIP md5-matched to working tree,
+  APP_VERSION 2.3.0, HTTP 200.
+- Known limitation: live diskpart/powershell execution requires real
+  Windows hardware (mocked with recorded payloads in tests).
+- Backlog (explicitly deferred by user): "Copy claim text" refund
+  helper; AdSense/affiliate/GA4 IDs; code signing; website
+  screenshots. Non-blocking code-review note: capacity_tab.py /
+  partition_tab.py are large; consider splitting in a future
+  refactor.
+
 ## Prioritized backlog
 - **P0** — none (all spec items shipped).
 - **P1** — replace placeholder URLs (canonical, affiliate, AdSense
