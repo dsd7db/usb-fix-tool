@@ -19,6 +19,7 @@ from typing import Dict, Optional
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QComboBox,
     QFileDialog,
@@ -407,6 +408,12 @@ class CapacityTab(QWidget):
         self.fake_label.setObjectName("fakeInfo")
         self.fake_label.setWordWrap(True)
         frow.addWidget(self.fake_label, stretch=1)
+        self.btn_claim = QPushButton("Copy Claim Text")
+        self.btn_claim.setToolTip(
+            "Copy a ready-to-paste refund/dispute message "
+            "(privacy-safe) to the clipboard")
+        self.btn_claim.clicked.connect(self._copy_claim_text)
+        frow.addWidget(self.btn_claim)
         self.btn_proof = QPushButton("Export Proof Report")
         self.btn_proof.setToolTip(
             "Save a privacy-safe FAIL report as evidence for a "
@@ -925,7 +932,7 @@ class CapacityTab(QWidget):
             return
         from main import APP_VERSION
         fp = p["fingerprint"]
-        rid = report.new_report_id()
+        rid = p["report_id"]
         device_rows = [
             ("USB device model", fp.model),
             ("Hardware / vendor ID", fp.vid_pid or "n/a"),
@@ -953,6 +960,33 @@ class CapacityTab(QWidget):
             device_rows=device_rows, test_rows=test_rows,
             method=report.METHOD_FAIL)
         self._save_report("fail-proof", html_text, rid)
+
+    def _copy_claim_text(self) -> None:
+        p = self._fix_payload
+        r = self._last_result
+        if not (p and r and r.get("status") == "fail"):
+            return
+        text = (
+            "Refund request — counterfeit (fake-capacity) USB "
+            "storage device\n\n"
+            "A full write-and-read capacity verification detected "
+            "that this USB drive is a fake-capacity (counterfeit) "
+            "device: data written beyond its real storage limit is "
+            "corrupted.\n\n"
+            f"- Claimed capacity: {fmt_bytes(p['advertised'])}\n"
+            f"- Verified real usable capacity: "
+            f"{fmt_bytes(p['usable'])}\n"
+            f"- Proof report ID: {p['report_id']}\n\n"
+            "The attached proof report contains the technical "
+            "evidence of this verification.")
+        QApplication.clipboard().setText(text)
+        self.log("success", "Claim text copied to clipboard "
+                            f"(report ID {p['report_id']}).")
+        QMessageBox.information(
+            self, "Claim text copied",
+            "A ready-to-paste refund/dispute message has been "
+            "copied to your clipboard.\n\nAttach the exported proof "
+            "report when you submit the claim.")
 
     # -- Fix Fake Drive -----------------------------------------------
     def _resolve_fingerprint(self):
@@ -1023,6 +1057,7 @@ class CapacityTab(QWidget):
                          f"{fmt_bytes(margin)}).")
         self._fix_payload = {
             "fingerprint": fp,
+            "report_id": report.new_report_id(),
             "advertised": fp.size_bytes,
             "tested": r.get("tested_bytes", 0),
             "usable": usable,

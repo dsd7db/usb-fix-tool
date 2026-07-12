@@ -42,7 +42,7 @@ from repair_tab import RepairTab
 
 # Replace this with your real affiliate URL when publishing.
 AFFILIATE_URL = "https://example.com/recover?ref=usbfixtool"
-APP_VERSION = "2.3.0"
+APP_VERSION = "2.3.1"
 
 
 def _asset_path(name: str) -> str:
