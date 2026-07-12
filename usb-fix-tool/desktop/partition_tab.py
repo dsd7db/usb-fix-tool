@@ -188,6 +188,7 @@ class FixFakeDriveDialog(QDialog):
 
 class PartitionTab(QWidget):
     busyChanged = Signal(bool)
+    reverifyRequested = Signal(dict)
 
     def __init__(self) -> None:
         super().__init__()
@@ -197,6 +198,9 @@ class PartitionTab(QWidget):
         self._thread: Optional[QThread] = None
         self._worker: Optional[CommandWorker] = None
         self._busy = False
+        self._pending_fix: Optional[dict] = None
+        self._active_fix: Optional[dict] = None
+        self._reverify_ctx: Optional[dict] = None
         self._build_ui()
         self.refresh_disks()
 
@@ -399,6 +403,26 @@ class PartitionTab(QWidget):
         row3.addWidget(self.status_label)
         row3.addWidget(self.progress, stretch=1)
         lay.addLayout(row3)
+
+        # Row 4: repair success + re-verify (hidden until a Fix Fake
+        # Drive workflow completes fully successfully)
+        self.success_row = QFrame()
+        srow = QHBoxLayout(self.success_row)
+        srow.setContentsMargins(0, 4, 0, 0)
+        srow.setSpacing(10)
+        self.success_label = QLabel("")
+        self.success_label.setObjectName("passInfo")
+        self.success_label.setWordWrap(True)
+        srow.addWidget(self.success_label, stretch=1)
+        self.btn_reverify = QPushButton("Re-verify Repaired Drive")
+        self.btn_reverify.setObjectName("primary")
+        self.btn_reverify.setToolTip(
+            "Run a real Full Capacity Test on the repaired partition "
+            "to prove the fix (asks for confirmation first)")
+        self.btn_reverify.clicked.connect(self._request_reverify)
+        srow.addWidget(self.btn_reverify)
+        self.success_row.setVisible(False)
+        lay.addWidget(self.success_row)
         return frame
 
     def _build_log_panel(self) -> QWidget:
@@ -836,15 +860,34 @@ class PartitionTab(QWidget):
                          f"{opts['size_mb']} MB, {opts['fs']}, "
                          f"{'quick' if opts['quick'] else 'full'} "
                          "format.")
+        self._pending_fix = {**payload, **opts,
+                             "fingerprint": self._current or fresh}
         self._start_op(
             partition_utils.repair_fake_drive,
             self._current or fresh, opts["size_mb"], opts["fs"],
             opts["label"], opts["quick"],
             status="Fix Fake Drive in progress…")
 
+    def _request_reverify(self) -> None:
+        if not self._reverify_ctx:
+            return
+        if self._busy:
+            QMessageBox.information(
+                self, "Operation running",
+                "Another partition operation is still running. "
+                "Please wait.")
+            return
+        self.log("info", "Re-verification requested for the "
+                         "repaired drive.")
+        self.reverifyRequested.emit(dict(self._reverify_ctx))
+
     # -- worker ---------------------------------------------------------
     def _start_op(self, fn, *args, status: str) -> None:
         self._busy = True
+        self._active_fix = self._pending_fix
+        self._pending_fix = None
+        self.success_row.setVisible(False)
+        self._reverify_ctx = None
         self._set_status(status, busy=True, tone="busy")
         self._update_buttons()
         self.busyChanged.emit(True)
@@ -871,8 +914,25 @@ class PartitionTab(QWidget):
             self._set_status("Operation failed — see the activity log "
                              "for the specific error",
                              busy=False, tone="err")
+        if self._active_fix is not None:
+            if code == 0:
+                self._show_repair_success(self._active_fix)
+            self._active_fix = None
         self._reload_current()
         self.busyChanged.emit(False)
+
+    def _show_repair_success(self, ctx: dict) -> None:
+        fp = ctx["fingerprint"]
+        self._reverify_ctx = dict(ctx)
+        self.success_label.setText(
+            f"REPAIR COMPLETED on {fp.model} (Disk {fp.number}) — "
+            f"advertised {fmt_bytes(ctx['advertised'])}, verified "
+            f"usable {fmt_bytes(ctx['usable'])}, new partition "
+            f"{ctx['size_mb']} MB ({ctx['fs']}). Run a full capacity "
+            "test on the repaired partition to prove the fix.")
+        self.success_row.setVisible(True)
+        self.log("success", "[ok] You can now re-verify the repaired "
+                            "drive with a Full Capacity Test.")
 
     def _set_status(self, text: str, *, busy: bool,
                     tone: str = "idle") -> None:

@@ -42,7 +42,7 @@ from repair_tab import RepairTab
 
 # Replace this with your real affiliate URL when publishing.
 AFFILIATE_URL = "https://example.com/recover?ref=usbfixtool"
-APP_VERSION = "2.2.0"
+APP_VERSION = "2.3.0"
 
 
 def _asset_path(name: str) -> str:
@@ -89,8 +89,14 @@ class MainWindow(QMainWindow):
             lambda busy: self._lock_tabs(busy, keep=2))
         self.capacity_tab.fixFakeDriveRequested.connect(
             self._on_fix_fake_drive)
+        self.partition_tab.reverifyRequested.connect(
+            self._on_reverify)
 
         root.addWidget(self._build_footer())
+
+    def _on_reverify(self, ctx: dict) -> None:
+        self.tabs.setCurrentWidget(self.capacity_tab)
+        self.capacity_tab.begin_reverify(ctx)
 
     def _on_fix_fake_drive(self, payload: dict) -> None:
         self.tabs.setCurrentWidget(self.partition_tab)
@@ -239,6 +245,9 @@ class MainWindow(QMainWindow):
         }
         QLabel#fakeInfo {
             color: #a02015; font-weight: 600; font-size: 12px;
+        }
+        QLabel#passInfo {
+            color: #135c2c; font-weight: 600; font-size: 12px;
         }
         QDialog { background-color: #f0f2f5; }
 

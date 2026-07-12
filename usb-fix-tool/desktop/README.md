@@ -18,6 +18,20 @@ built with **PySide6**.
 - Test files are written to free space only and deleted afterwards —
   existing files are never touched
 
+### Re-verify Repaired Drive & Reports (v2.3)
+- After a fully successful Fix Fake Drive, a **Re-verify Repaired
+  Drive** action appears (never after failed/partial repairs)
+- Re-verification re-checks the exact same physical USB (identity
+  re-verified), locates the repaired partition, confirms it is
+  accessible, then runs the existing real Full Capacity Test after
+  user confirmation
+- A genuine PASS unlocks a **Verification Certificate**; a FAILED
+  fake-capacity test can export a **Proof Report** for refund claims
+- Reports are privacy-safe (masked serial + SHA-256 device
+  fingerprint), print-ready HTML (browser Print → Save as PDF),
+  carry a locally generated report ID, and explicitly state they are
+  not an official/legal certification
+
 ### Fix Fake Drive (v2.2)
 - A FAILED Full-capacity test on a verified removable USB flash
   drive offers a one-click **Fix Fake Drive** action

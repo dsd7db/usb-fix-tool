@@ -12,6 +12,7 @@ import os
 import shutil
 import threading
 import time
+import webbrowser
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -38,6 +39,7 @@ from PySide6.QtWidgets import (
 
 import storage_test
 import partition_utils
+import report
 import usb_utils
 from storage_test import fmt_bytes
 
@@ -118,6 +120,8 @@ class CapacityTab(QWidget):
         self._devices = []
         self._session: Dict = {}              # per-test-run context
         self._fix_payload: Optional[Dict] = None
+        self._reverify_ctx: Optional[Dict] = None
+        self._last_result: Optional[Dict] = None
         self._thread: Optional[QThread] = None
         self._worker: Optional[TestWorker] = None
         self._stop_event: Optional[threading.Event] = None
@@ -403,6 +407,12 @@ class CapacityTab(QWidget):
         self.fake_label.setObjectName("fakeInfo")
         self.fake_label.setWordWrap(True)
         frow.addWidget(self.fake_label, stretch=1)
+        self.btn_proof = QPushButton("Export Proof Report")
+        self.btn_proof.setToolTip(
+            "Save a privacy-safe FAIL report as evidence for a "
+            "refund claim")
+        self.btn_proof.clicked.connect(self._export_fail_proof)
+        frow.addWidget(self.btn_proof)
         self.btn_details = QPushButton("View Details")
         self.btn_details.clicked.connect(self._show_fix_details)
         frow.addWidget(self.btn_details)
@@ -415,6 +425,24 @@ class CapacityTab(QWidget):
         frow.addWidget(self.btn_fix)
         self.fake_row.setVisible(False)
         lay.addWidget(self.fake_row)
+
+        self.pass_row = QFrame()
+        prow = QHBoxLayout(self.pass_row)
+        prow.setContentsMargins(0, 4, 0, 0)
+        prow.setSpacing(10)
+        self.pass_label = QLabel("")
+        self.pass_label.setObjectName("passInfo")
+        self.pass_label.setWordWrap(True)
+        prow.addWidget(self.pass_label, stretch=1)
+        self.btn_cert = QPushButton("Generate Verification Certificate")
+        self.btn_cert.setObjectName("primary")
+        self.btn_cert.setToolTip(
+            "Save a privacy-safe PASS report proving the repaired "
+            "drive verified successfully")
+        self.btn_cert.clicked.connect(self._generate_certificate)
+        prow.addWidget(self.btn_cert)
+        self.pass_row.setVisible(False)
+        lay.addWidget(self.pass_row)
         return frame
 
     def _build_log_panel(self) -> QWidget:
@@ -554,10 +582,18 @@ class CapacityTab(QWidget):
 
         self.result_panel.setVisible(False)
         self._set_running(True)
+        rv = self._reverify_ctx
+        self._reverify_ctx = None
         self._session = {
             "mode_full": self.rb_full.isChecked(),
-            "fingerprint": self._resolve_fingerprint(),
+            "fingerprint": (rv["fingerprint"] if rv
+                            else self._resolve_fingerprint()),
+            "reverify": rv,
         }
+        if rv:
+            self.log("info", "Full capacity re-verification started "
+                             "on the repaired partition "
+                             f"{rv.get('partition_letter', '?')}:.")
         self.log("info", "Test started.")
         mode = ("Full capacity" if self.rb_full.isChecked() else
                 "Quick verification" if self.rb_quick.isChecked()
@@ -647,7 +683,9 @@ class CapacityTab(QWidget):
     def _show_result(self, r: Dict) -> None:
         status = r["status"]
         self._fix_payload = None
+        self._last_result = r
         self.fake_row.setVisible(False)
+        self.pass_row.setVisible(False)
         self.repair_note.setVisible(False)
         if status == "pass":
             self.result_panel.setProperty("state", "pass")
@@ -683,8 +721,238 @@ class CapacityTab(QWidget):
         v["dur"].setText(_fmt_time(r.get("duration", -1)))
         if status == "fail":
             self._evaluate_fake_fix(r)
+        rv = self._session.get("reverify")
+        if rv:
+            if status == "pass":
+                self.log("success", "Re-verification PASS — the "
+                                    "repaired drive verified "
+                                    "successfully.")
+                fp = rv["fingerprint"]
+                self.pass_label.setText(
+                    f"RE-VERIFICATION PASS — {fp.model} verified at "
+                    f"{fmt_bytes(r.get('verified_ok', 0))} with 0 "
+                    "errors. Generate a shareable certificate as "
+                    "proof.")
+                self.pass_row.setVisible(True)
+            elif status == "fail":
+                self.log("error", "Re-verification FAIL — the "
+                                  "repaired drive still shows data "
+                                  "errors. Certificate unavailable "
+                                  "because the test did not PASS.")
+            elif status == "stopped":
+                self.log("warning", "Verification stopped by user — "
+                                    "certificate unavailable because "
+                                    "the test did not PASS.")
         self.result_panel.setVisible(True)
         self.hint_label.setText("Test finished.")
+
+    # -- Re-verify repaired drive ---------------------------------------
+    def _partition_path(self, part) -> str:
+        return f"{part.drive_letter}:\\"
+
+    def begin_reverify(self, ctx: Dict) -> None:
+        """Entry point from a successful Fix Fake Drive."""
+        if self._running:
+            QMessageBox.information(
+                self, "Test running",
+                "A capacity test is already in progress.")
+            return
+        fp = ctx["fingerprint"]
+        ok, reason, fresh = partition_utils.verify_identity(fp)
+        if not ok:
+            self.log("error", f"Repaired USB identity verification "
+                              f"failed — {reason}")
+            QMessageBox.critical(
+                self, "Re-verification blocked",
+                "The repaired USB device could not be reliably "
+                f"identified. Re-verification has been blocked for "
+                f"safety.\n\n{reason}")
+            return
+        self.log("success", f"[ok] Repaired USB identity verified: "
+                            f"Disk {fresh.number} — {fresh.model} "
+                            f"(S/N {fresh.serial or 'n/a'}).")
+        parts = partition_utils.list_partitions(fresh.number)
+        part = next((p for p in parts
+                     if p.file_system and not p.protected), None)
+        if part is None:
+            self.log("error", "Repaired partition not found on the "
+                              "device.")
+            QMessageBox.critical(
+                self, "Repaired partition not found",
+                "No formatted partition was found on the repaired "
+                "drive. Refresh the USB Partitions tab and format "
+                "the drive if needed.")
+            return
+        if not part.drive_letter:
+            self.log("error", "Repaired partition has no drive "
+                              "letter — it is not accessible for "
+                              "testing.")
+            QMessageBox.critical(
+                self, "Repaired partition inaccessible",
+                "The repaired partition has no drive letter. Assign "
+                "one in the Repair Tools tab, then try again.")
+            return
+        path = self._partition_path(part)
+        if not os.path.isdir(path) or not os.access(path, os.W_OK):
+            self.log("error", f"Repaired partition "
+                              f"{part.drive_letter}: is not "
+                              "accessible or not writable.")
+            QMessageBox.critical(
+                self, "Repaired partition inaccessible",
+                f"The repaired partition {part.drive_letter}: could "
+                "not be accessed for testing. Reconnect the drive "
+                "and try again.")
+            return
+        self.log("info", f"Repaired partition detected: "
+                         f"{part.drive_letter}: "
+                         f"({part.file_system}, "
+                         f"{fmt_bytes(part.size_bytes)}).")
+
+        dev = next(
+            (d for d in usb_utils.list_usb_drives()
+             if d.drive_letter.rstrip(":").upper()
+             == part.drive_letter.upper()), None)
+        self._set_target(path, device=dev)
+        self.rb_full.setChecked(True)
+
+        est = storage_test.testable_bytes(path)
+        ans = QMessageBox.question(
+            self, "Start full re-verification?",
+            "A Full Capacity Test will now write about "
+            f"{fmt_bytes(est)} of test data to "
+            f"{part.drive_letter}: and read every byte back.\n\n"
+            "This can take significant time depending on the drive "
+            "speed. Start now?")
+        if ans != QMessageBox.StandardButton.Yes:
+            self.log("info", "Re-verification cancelled before "
+                             "start.")
+            return
+        self._reverify_ctx = {
+            **ctx,
+            "fingerprint": fresh,
+            "partition_letter": part.drive_letter,
+            "partition_capacity": part.size_bytes,
+            "partition_fs": part.file_system,
+        }
+        self.start_test()
+
+    # -- reports ----------------------------------------------------------
+    def _save_report(self, kind: str, html_text: str,
+                     report_id: str) -> None:
+        default = os.path.join(
+            os.path.expanduser("~"),
+            f"usb-{kind}-{report_id.lower()}.html")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save report", default, "HTML report (*.html)")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(html_text)
+        except OSError as e:
+            self.log("error", f"Report generation failed: {e}")
+            QMessageBox.critical(
+                self, "Report generation failed",
+                f"The report could not be saved:\n{e}")
+            return
+        if kind == "certificate":
+            self.log("success", f"Verification certificate "
+                                f"generated: {path} "
+                                f"(ID {report_id}).")
+        else:
+            self.log("success", f"Proof report exported: {path} "
+                                f"(ID {report_id}).")
+        ans = QMessageBox.question(
+            self, "Report saved",
+            f"Report saved to:\n{path}\n\nOpen it in your browser "
+            "now? (Use the browser's Print → Save as PDF for a PDF "
+            "copy.)")
+        if ans == QMessageBox.StandardButton.Yes:
+            webbrowser.open("file:///" + path.replace("\\", "/"))
+
+    def _generate_certificate(self) -> None:
+        rv = self._session.get("reverify")
+        r = self._last_result
+        if not (rv and r and r.get("status") == "pass"):
+            self.log("error", "Certificate unavailable because the "
+                              "test did not PASS.")
+            QMessageBox.warning(
+                self, "Certificate unavailable",
+                "A verification certificate can only be generated "
+                "after the repaired drive genuinely passes a Full "
+                "Capacity Test.")
+            return
+        from main import APP_VERSION
+        fp = rv["fingerprint"]
+        rid = report.new_report_id()
+        device_rows = [
+            ("USB device model", fp.model),
+            ("Hardware / vendor ID", fp.vid_pid or "n/a"),
+            ("Serial number (masked)", report.mask_serial(fp.serial)),
+            ("Device fingerprint", report.device_fingerprint(
+                fp.model, fp.serial, fp.size_bytes)),
+            ("Original advertised capacity",
+             fmt_bytes(rv["advertised"])),
+            ("Previously detected usable capacity",
+             fmt_bytes(rv["usable"])),
+            ("Repaired partition capacity",
+             fmt_bytes(rv.get("partition_capacity",
+                              rv["size_mb"] * MiB))),
+            ("File system", rv.get("partition_fs", rv["fs"])),
+        ]
+        test_rows = [
+            ("Result", "PASS — no errors detected"),
+            ("Total capacity tested", fmt_bytes(r["tested_bytes"])),
+            ("Total capacity verified", fmt_bytes(r["verified_ok"])),
+            ("Write errors", str(r["write_errors"])),
+            ("Read/verification errors", str(r["verify_errors"])),
+            ("Average write speed", _fmt_speed(r["avg_write"])),
+            ("Average read speed", _fmt_speed(r["avg_read"])),
+            ("Total test duration", _fmt_time(r["duration"])),
+        ]
+        html_text = report.build_report_html(
+            result="PASS — VERIFIED", badge="pass",
+            title="Storage Verification Certificate",
+            app_version=APP_VERSION, report_id=rid,
+            device_rows=device_rows, test_rows=test_rows,
+            method=report.METHOD_PASS)
+        self._save_report("certificate", html_text, rid)
+
+    def _export_fail_proof(self) -> None:
+        p = self._fix_payload
+        r = self._last_result
+        if not (p and r and r.get("status") == "fail"):
+            return
+        from main import APP_VERSION
+        fp = p["fingerprint"]
+        rid = report.new_report_id()
+        device_rows = [
+            ("USB device model", fp.model),
+            ("Hardware / vendor ID", fp.vid_pid or "n/a"),
+            ("Serial number (masked)", report.mask_serial(fp.serial)),
+            ("Device fingerprint", report.device_fingerprint(
+                fp.model, fp.serial, fp.size_bytes)),
+            ("Advertised capacity", fmt_bytes(p["advertised"])),
+        ]
+        test_rows = [
+            ("Result", "FAKE CAPACITY DETECTED — FAIL"),
+            ("Tested capacity", fmt_bytes(p["tested"])),
+            ("Verified usable capacity", fmt_bytes(p["usable"])),
+            ("Corrupted / invalid capacity",
+             fmt_bytes(p["corrupted"])),
+            ("Write errors", str(p["write_errors"])),
+            ("Read/verification errors", str(p["verify_errors"])),
+            ("Average write speed", _fmt_speed(r["avg_write"])),
+            ("Average read speed", _fmt_speed(r["avg_read"])),
+            ("Total test duration", _fmt_time(r["duration"])),
+        ]
+        html_text = report.build_report_html(
+            result="FAKE CAPACITY — FAIL", badge="fail",
+            title="Fake Capacity Proof Report",
+            app_version=APP_VERSION, report_id=rid,
+            device_rows=device_rows, test_rows=test_rows,
+            method=report.METHOD_FAIL)
+        self._save_report("fail-proof", html_text, rid)
 
     # -- Fix Fake Drive -----------------------------------------------
     def _resolve_fingerprint(self):

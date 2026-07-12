@@ -139,6 +139,32 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   dialog gating → repair → final refreshed state). Capacity-test
   regression PASS. v2.2.0, ZIP repackaged (HTTP 200).
 
+## What's been implemented (Jun 2026) — v2.3 Re-verify + Certificates
+- ✅ After a fully successful Fix Fake Drive (code 0 only), the USB
+  Partitions tab shows a "REPAIR COMPLETED" row with **Re-verify
+  Repaired Drive**; never shown after failed/partial repairs.
+- ✅ `begin_reverify` (capacity tab): re-verifies device identity
+  (reuses partition_utils.verify_identity), locates the repaired
+  formatted partition, checks drive-letter accessibility/writability,
+  auto-selects it as target, forces Full mode, asks user confirmation
+  (with real data-size estimate) before starting the existing real
+  Full Capacity Test. Specific errors for identity change/disconnect,
+  partition missing, no drive letter, inaccessible path.
+- ✅ PASS of a re-verification run shows **Generate Verification
+  Certificate**; certificate is gated hard (only reverify session +
+  genuine pass result). FAILED fake-capacity results get **Export
+  Proof Report**.
+- ✅ `report.py`: print-ready standalone HTML reports (no PDF dep;
+  browser Print→PDF), masked serial (FA***23 style), SHA-256 12-hex
+  device fingerprint, local report ID (UFT-YYYYMMDD-XXXXXXXX),
+  honest disclaimer (no official/legal certification claims),
+  method summary. Save via file dialog + optional browser open.
+- ✅ Tests (offscreen E2E): cert gate refused after FAIL; FAIL proof
+  exported with masked serial; repair→success row→re-verify runs a
+  REAL 64MB full write+verify test→PASS row→certificate generated
+  and content-verified. Capacity + fix-fake regressions PASS.
+  v2.3.0, ZIP repackaged (HTTP 200).
+
 ## Prioritized backlog
 - **P0** — none (all spec items shipped).
 - **P1** — replace placeholder URLs (canonical, affiliate, AdSense
