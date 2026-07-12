@@ -184,6 +184,20 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   partition_tab.py are large; consider splitting in a future
   refactor.
 
+## v2.3.1 — Copy Claim Text (Jun 2026)
+- ✅ "Copy Claim Text" button in the fake-capacity FAIL row: copies a
+  concise privacy-safe refund/dispute message (issue, claimed
+  capacity, verified usable capacity, proof report ID, "attached
+  proof report contains the technical evidence"). No serial/model in
+  the text. Report ID now generated once per FAIL result and reused
+  by the proof report.
+- ✅ tests/test_claim_text.py added (visibility, clipboard content,
+  privacy, ID reuse, guard); run_all.sh now 7 stages.
+- ✅ Independent testing-agent verification
+  (/app/test_reports/iteration_2.json): 100% pass, no regressions,
+  only intended files changed, ZIP md5-matched with
+  APP_VERSION 2.3.1.
+
 ## Prioritized backlog
 - **P0** — none (all spec items shipped).
 - **P1** — replace placeholder URLs (canonical, affiliate, AdSense
