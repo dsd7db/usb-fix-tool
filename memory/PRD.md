@@ -216,3 +216,12 @@ monetization integration, (4) 5 SEO blog articles for traffic.
    `download.html`.
 3. Deploy `website/` to chosen static host; update `<link
    rel="canonical">` URLs.
+
+
+## v2.3.1 Release Packaging (2026-09-04)
+- Packaging-only task, no functionality changed. Full headless regression suite re-run: ALL PASSED.
+- Added `desktop/run.bat` (one-click: venv + pip install + launch via pythonw) and `WINDOWS-QUICKSTART.txt`.
+- Verified launch path in a fresh venv (install from requirements.txt -> MainWindow v2.3.1 with 3 tabs).
+- Release ZIP: `/app/frontend/public/usb-fix-tool-v2.3.1.zip` (also copied to `usb-fix-tool.zip`), 52 files, no __pycache__/.venv.
+  sha256 60bc5138e73615dc4c1dea8f171f02229e71ad08521ca60668911dc6ebe90938
+- Native .exe cannot be cross-built on Linux (no Wine); user builds locally with `build.bat` -> `dist/USBFixTool/USBFixTool.exe`.

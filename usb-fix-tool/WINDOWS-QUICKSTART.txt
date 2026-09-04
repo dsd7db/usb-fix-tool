@@ -1,0 +1,43 @@
+USB Fix Tool v2.3.1 - Windows Quick Start
+==========================================
+
+Requirements
+------------
+* Windows 10 / 11 (64-bit)
+* Python 3.10 or newer  ->  https://www.python.org/downloads/windows/
+  During install tick "Add python.exe to PATH".
+* Internet connection on first run (downloads PySide6, ~100 MB)
+
+Option 1 - Run from source (no build needed)
+--------------------------------------------
+1. Unzip usb-fix-tool-v2.3.1.zip anywhere (e.g. C:\USBFixTool).
+2. Open the "desktop" folder.
+3. Right-click run.bat -> "Run as administrator".
+   (Administrator rights are required for the Repair / Partition /
+   Fix Fake Drive tools. The Capacity Test itself works without them.)
+4. First run creates .venv and installs dependencies (1-2 min).
+   Later runs start in a few seconds.
+
+Option 2 - Build a standalone USBFixTool.exe
+--------------------------------------------
+1. In the "desktop" folder double-click build.bat.
+2. Wait for "Done." (about 2-3 min).
+3. Your portable app is in  desktop\dist\USBFixTool\USBFixTool.exe
+   Copy the whole USBFixTool folder anywhere; no Python needed to run it.
+   The exe asks for administrator rights automatically (UAC).
+
+Verify the source (optional)
+----------------------------
+    cd desktop\tests
+    ..\.venv\Scripts\python.exe test_engine.py
+(Full suite: bash run_all.sh in Git Bash / WSL.)
+
+Folder layout
+-------------
+desktop\   Python/PySide6 application, run.bat, build.bat, build.spec, tests
+website\   Static SEO website (open website\index.html in a browser)
+
+Safety note
+-----------
+Format / partition / Fix Fake Drive operations erase data on the
+selected removable USB drive. Read every confirmation dialog.
