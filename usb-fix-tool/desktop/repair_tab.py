@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 )
 
 import usb_utils
+from scan_worker import BackgroundScan
 
 
 class CommandWorker(QObject):
@@ -64,6 +65,7 @@ class RepairTab(QWidget):
         self._thread: Optional[QThread] = None
         self._worker: Optional[CommandWorker] = None
         self._devices: List[usb_utils.UsbDevice] = []
+        self._scan = BackgroundScan(self)
         self._build_ui()
         self.refresh_devices()
         if not usb_utils.is_admin():
@@ -261,9 +263,9 @@ class RepairTab(QWidget):
 
     def set_buttons_enabled(self, enabled: bool) -> None:
         for b in (self.btn_chkdsk, self.btn_format,
-                  self.btn_advanced, self.btn_assign,
-                  self.btn_refresh):
+                  self.btn_advanced, self.btn_assign):
             b.setEnabled(enabled)
+        self.btn_refresh.setEnabled(enabled and not self._scan.is_running())
 
     def _set_status(self, text: str, *, busy: bool,
                     tone: str = "idle") -> None:
@@ -279,8 +281,38 @@ class RepairTab(QWidget):
 
     # -- actions -------------------------------------------------------
     def refresh_devices(self) -> None:
+        if self._scan.is_running():
+            return
         self.log("Scanning for removable drives...")
-        self._devices = usb_utils.list_usb_drives()
+        self._devices = []
+        self._show_placeholder("Scanning for removable drives…")
+        self.btn_refresh.setEnabled(False)
+        self.btn_refresh.setText("Scanning…")
+        self._scan.start(usb_utils.list_usb_drives,
+                         on_done=self._on_devices_scanned,
+                         on_error=self._on_scan_failed)
+
+    def is_scanning(self) -> bool:
+        return self._scan.is_running()
+
+    def _show_placeholder(self, text: str) -> None:
+        self.table.setRowCount(1)
+        item = QTableWidgetItem(text)
+        item.setFlags(Qt.ItemFlag.NoItemFlags)
+        self.table.setItem(0, 0, item)
+        for c in range(1, self.table.columnCount()):
+            blank = QTableWidgetItem("")
+            blank.setFlags(Qt.ItemFlag.NoItemFlags)
+            self.table.setItem(0, c, blank)
+
+    def _scan_finished(self) -> None:
+        self.btn_refresh.setText("Refresh")
+        self.btn_refresh.setEnabled(not self.is_busy())
+
+    @Slot(object)
+    def _on_devices_scanned(self, devices) -> None:
+        self._devices = list(devices)
+        self.table.setRowCount(0)
         self.table.setRowCount(len(self._devices))
 
         mono = QFont("Consolas", 9)
@@ -303,9 +335,18 @@ class RepairTab(QWidget):
                 self.table.setItem(r, c, item)
 
         if not self._devices:
+            self._show_placeholder("No removable USB drives detected")
             self.log("No removable USB drives detected.")
         else:
             self.log(f"Found {len(self._devices)} drive(s).")
+        self._scan_finished()
+
+    @Slot(str)
+    def _on_scan_failed(self, message: str) -> None:
+        self._devices = []
+        self._show_placeholder("Drive scan failed — press Refresh")
+        self.log(f"[error] Removable drive scan failed: {message}")
+        self._scan_finished()
 
     def _start_worker(self, fn, *args, status: str = "Working...",
                       **kwargs) -> None:

@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 import partition_utils
 import usb_utils
 from repair_tab import CommandWorker
+from scan_worker import BackgroundScan
 from storage_test import fmt_bytes
 
 MiB = 1024 ** 2
@@ -53,6 +54,13 @@ LOG_COLORS = {
     "warning": "#9a6700",
     "error": "#c42b1c",
 }
+
+
+def _inspect_disk(disk):
+    """Worker-side: re-verify identity, then read the partition layout."""
+    ok, reason, fresh = partition_utils.verify_identity(disk)
+    parts = partition_utils.list_partitions(fresh.number) if ok else []
+    return ok, reason, fresh, parts
 
 
 class FixFakeDriveDialog(QDialog):
@@ -201,6 +209,9 @@ class PartitionTab(QWidget):
         self._pending_fix: Optional[dict] = None
         self._active_fix: Optional[dict] = None
         self._reverify_ctx: Optional[dict] = None
+        self._prev_identity = None
+        self._status_after_scan = None
+        self._scan = BackgroundScan(self)
         self._build_ui()
         self.refresh_disks()
 
@@ -465,11 +476,53 @@ class PartitionTab(QWidget):
 
     # -- device handling ------------------------------------------------
     def refresh_disks(self) -> None:
+        if self._scan.is_running():
+            return
+        prev = self._current
+        self._prev_identity = ((prev.number, prev.serial, prev.size_bytes)
+                               if prev else None)
         self.log("info", "Scanning for removable USB flash drives...")
-        disks, hidden = partition_utils.list_usb_disks()
+        self._status_after_scan = None
+        self._current = None
+        self._partitions = []
+        self.disk_combo.blockSignals(True)
+        self.disk_combo.clear()
+        self.disk_combo.addItem("Scanning for removable USB flash drives…")
+        self.disk_combo.setCurrentIndex(0)
+        self.disk_combo.blockSignals(False)
+        self._set_status("Scanning for removable USB flash drives…",
+                         busy=True, tone="busy")
+        self._render_device_info()
+        self._render_partitions()
+        self._scan.start(partition_utils.list_usb_disks,
+                         on_done=self._on_disks_scanned,
+                         on_error=self._on_scan_failed)
+        self._set_scanning(True)
+
+    def _set_scanning(self, on: bool) -> None:
+        self.btn_refresh.setText("Scanning…" if on else "Refresh")
+        self._update_buttons()
+
+    @Slot(object)
+    def _on_disks_scanned(self, result) -> None:
+        disks, hidden = result
+        idx = self._apply_disks(disks, hidden)
+        self._set_scanning(False)
+        if idx < 0:
+            self._set_status("Ready", busy=False, tone="idle")
+            self._render_device_info()
+            self._render_partitions()
+            self._update_buttons()
+            return
+        self._on_disk_pick(idx)
+
+    def _apply_disks(self, disks, hidden) -> int:
+        """GUI-side population of the disk list. Returns auto-select index."""
         eligible = [d for d in disks if d.eligible]
         blocked = [d for d in disks if not d.eligible]
         self._disks = eligible
+        prev = getattr(self, "_prev_identity", None)
+        self._prev_identity = None
 
         self.disk_combo.blockSignals(True)
         self.disk_combo.clear()
@@ -478,12 +531,14 @@ class PartitionTab(QWidget):
                 self.disk_combo.addItem(
                     f"Disk {d.number} — {d.model} "
                     f"({fmt_bytes(d.size_bytes)})")
-            self.disk_combo.setCurrentIndex(-1)
+            idx = next((i for i, d in enumerate(eligible)
+                        if (d.number, d.serial, d.size_bytes) == prev), 0)
+            self.disk_combo.setCurrentIndex(idx)
         else:
+            idx = -1
             self.disk_combo.addItem(
                 "No removable USB flash drives detected")
             self.disk_combo.setCurrentIndex(0)
-        self.disk_combo.setEnabled(bool(eligible))
         self.disk_combo.blockSignals(False)
 
         if hidden:
@@ -503,6 +558,22 @@ class PartitionTab(QWidget):
                                 "and press Refresh.")
         self._current = None
         self._partitions = []
+        return idx
+
+    @Slot(str)
+    def _on_scan_failed(self, message: str) -> None:
+        self._disks = []
+        self._current = None
+        self._partitions = []
+        self.disk_combo.blockSignals(True)
+        self.disk_combo.clear()
+        self.disk_combo.addItem("Device scan failed — press Refresh")
+        self.disk_combo.setCurrentIndex(0)
+        self.disk_combo.blockSignals(False)
+        self.log("error", f"USB device scan failed: {message}")
+        self._set_status("Device scan failed — see the activity log",
+                         busy=False, tone="err")
+        self._set_scanning(False)
         self._render_device_info()
         self._render_partitions()
         self._update_buttons()
@@ -518,30 +589,59 @@ class PartitionTab(QWidget):
 
     def _reload_current(self) -> None:
         """Re-query the selected disk and its partitions from the OS."""
-        if not self._current:
+        if not self._current or self._scan.is_running():
             return
-        ok, reason, fresh = partition_utils.verify_identity(
-            self._current)
+        self._set_status(f"Reading Disk {self._current.number}…",
+                         busy=True, tone="busy")
+        self._scan.start(_inspect_disk, self._current,
+                         on_done=self._on_inspected,
+                         on_error=self._on_inspect_failed)
+        self._set_scanning(True)
+
+    @Slot(object)
+    def _on_inspected(self, result) -> None:
+        ok, reason, fresh, parts = result
+        self._apply_inspection(ok, reason, fresh, parts)
+        self._set_scanning(False)
+        text, tone = self._status_after_scan or ("Ready", "idle")
+        self._status_after_scan = None
+        if not ok:
+            text, tone = ("USB identity verification failed — see the "
+                          "activity log", "err")
+        self._set_status(text, busy=False, tone=tone)
+        self._render_device_info()
+        self._render_partitions()
+        self._update_buttons()
+
+    @Slot(str)
+    def _on_inspect_failed(self, message: str) -> None:
+        self.log("error", f"Reading the USB device failed: {message}")
+        self._current = None
+        self._partitions = []
+        self._set_scanning(False)
+        self._set_status("Reading the USB device failed — press "
+                         "Refresh", busy=False, tone="err")
+        self._render_device_info()
+        self._render_partitions()
+        self._update_buttons()
+
+    def _apply_inspection(self, ok, reason, fresh, parts) -> None:
         if not ok:
             self.log("error", f"USB identity verification failed: "
                               f"{reason}")
             self._current = None
             self._partitions = []
-        else:
-            self._current = fresh
-            self._partitions = partition_utils.list_partitions(
-                fresh.number)
-            self.log("info", f"USB device information refreshed: "
-                             f"{len(self._partitions)} partition(s), "
-                             f"{fmt_bytes(fresh.largest_free)} "
-                             "unallocated.")
-            if fresh.is_readonly:
-                self.log("warning", "Write-protected USB device "
-                                    "detected — destructive "
-                                    "operations will be blocked.")
-        self._render_device_info()
-        self._render_partitions()
-        self._update_buttons()
+            return
+        self._current = fresh
+        self._partitions = parts
+        self.log("info", f"USB device information refreshed: "
+                         f"{len(self._partitions)} partition(s), "
+                         f"{fmt_bytes(fresh.largest_free)} "
+                         "unallocated.")
+        if fresh.is_readonly:
+            self.log("warning", "Write-protected USB device "
+                                "detected — destructive "
+                                "operations will be blocked.")
 
     def _render_device_info(self) -> None:
         v = self._info_vals
@@ -600,7 +700,7 @@ class PartitionTab(QWidget):
 
     # -- button state -----------------------------------------------------
     def _update_buttons(self) -> None:
-        busy = self._busy
+        busy = self._busy or self._scan.is_running()
         has_disk = self._current is not None
         part = self._selected_partition()
         can_touch_part = (has_disk and part is not None
@@ -628,6 +728,12 @@ class PartitionTab(QWidget):
                 self, "Operation running",
                 "Another partition operation is still running. "
                 "Please wait.")
+            return False
+        if self._scan.is_running():
+            QMessageBox.information(
+                self, "Device scan in progress",
+                "The USB device is still being read. Please wait a "
+                "moment and try again.")
             return False
         if not usb_utils.is_admin():
             self.log("error", "Administrator privileges required — "
@@ -798,6 +904,12 @@ class PartitionTab(QWidget):
                 "Another partition operation is still running. "
                 "Please wait.")
             return
+        if self._scan.is_running():
+            QMessageBox.information(
+                self, "Device scan in progress",
+                "The USB device list is still being read. Please wait "
+                "a moment and try again.")
+            return
         self.log("info", "Fix Fake Drive requested from Capacity "
                          "Test.")
         if not usb_utils.is_admin():
@@ -832,13 +944,19 @@ class PartitionTab(QWidget):
                             f"Disk {fresh.number} — {fresh.model} "
                             f"(S/N {fresh.serial or 'n/a'}).")
 
-        # Select the verified disk in this tab's own device list.
-        self.refresh_disks()
+        # Select the verified disk in this tab's own device list
+        # (synchronous rescan: this is a destructive-workflow gate).
+        self.log("info", "Scanning for removable USB flash drives...")
+        self._prev_identity = None
+        self._apply_disks(*partition_utils.list_usb_disks())
         idx = next((i for i, d in enumerate(self._disks)
                     if d.number == fresh.number
                     and d.serial == fresh.serial
                     and d.size_bytes == fresh.size_bytes), -1)
         if idx < 0:
+            self._render_device_info()
+            self._render_partitions()
+            self._update_buttons()
             self.log("error", "USB identity ambiguous after rescan — "
                               "repair aborted.")
             QMessageBox.critical(
@@ -846,7 +964,18 @@ class PartitionTab(QWidget):
                 "The original tested USB device could not be reliably "
                 "identified. Repair has been blocked for safety.")
             return
+        self.disk_combo.blockSignals(True)
         self.disk_combo.setCurrentIndex(idx)
+        self.disk_combo.blockSignals(False)
+        self._current = self._disks[idx]
+        d = self._current
+        self.log("info", f"USB device selected: Disk {d.number} — "
+                         f"{d.model} (S/N {d.serial or 'n/a'}, "
+                         f"{fmt_bytes(d.size_bytes)}).")
+        self._apply_inspection(*_inspect_disk(self._current))
+        self._render_device_info()
+        self._render_partitions()
+        self._update_buttons()
 
         dlg = FixFakeDriveDialog(self, self._current or fresh,
                                  self._partitions, payload)
@@ -908,12 +1037,14 @@ class PartitionTab(QWidget):
         self._worker = None
         self._busy = False
         if code == 0:
-            self._set_status("Operation completed successfully",
-                             busy=False, tone="ok")
+            self._status_after_scan = ("Operation completed successfully",
+                                       "ok")
         else:
-            self._set_status("Operation failed — see the activity log "
-                             "for the specific error",
-                             busy=False, tone="err")
+            self._status_after_scan = ("Operation failed — see the "
+                                       "activity log for the specific "
+                                       "error", "err")
+        self._set_status(self._status_after_scan[0], busy=False,
+                         tone=self._status_after_scan[1])
         if self._active_fix is not None:
             if code == 0:
                 self._show_repair_success(self._active_fix)
@@ -947,4 +1078,4 @@ class PartitionTab(QWidget):
             self.progress.setValue(0)
 
     def is_busy(self) -> bool:
-        return self._busy
+        return self._busy or self._scan.is_running()

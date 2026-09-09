@@ -42,6 +42,7 @@ import storage_test
 import partition_utils
 import report
 import usb_utils
+from scan_worker import BackgroundScan
 from storage_test import fmt_bytes
 
 GiB = 1024 ** 3
@@ -127,6 +128,7 @@ class CapacityTab(QWidget):
         self._worker: Optional[TestWorker] = None
         self._stop_event: Optional[threading.Event] = None
         self._running = False
+        self._scan = BackgroundScan(self)
         self._build_ui()
         self.refresh_drives()
 
@@ -176,13 +178,6 @@ class CapacityTab(QWidget):
         self.btn_refresh.setToolTip("Rescan removable drives")
         self.btn_refresh.clicked.connect(self.refresh_drives)
         row.addWidget(self.btn_refresh)
-
-        self.btn_browse = QPushButton("Select Target…")
-        self.btn_browse.setObjectName("primaryOutline")
-        self.btn_browse.setToolTip(
-            "Choose any drive or folder to test")
-        self.btn_browse.clicked.connect(self._on_browse)
-        row.addWidget(self.btn_browse)
         lay.addLayout(row)
 
         self.target_label = QLabel("No target selected")
@@ -269,6 +264,7 @@ class CapacityTab(QWidget):
 
         self.btn_start = QPushButton("▶  Start Test")
         self.btn_start.setObjectName("primary")
+        self.btn_start.setEnabled(False)
         self.btn_start.setToolTip("Write test data and verify it "
                                   "against the written pattern")
         self.btn_start.clicked.connect(self.start_test)
@@ -473,8 +469,34 @@ class CapacityTab(QWidget):
         sb.setValue(sb.maximum())
 
     # -- target handling -------------------------------------------------
+    NO_DEVICES_TEXT = "No removable USB drives detected"
+
     def refresh_drives(self) -> None:
-        self._devices = usb_utils.list_usb_drives()
+        if self._scan.is_running():
+            return
+        self.btn_refresh.setEnabled(False)
+        self.btn_refresh.setText("Scanning…")
+        self.drive_combo.blockSignals(True)
+        self.drive_combo.clear()
+        self.drive_combo.addItem("Scanning for removable USB drives…")
+        self.drive_combo.setEnabled(False)
+        self.drive_combo.blockSignals(False)
+        self._scan.start(usb_utils.list_usb_drives,
+                         on_done=self._on_drives_scanned,
+                         on_error=self._on_scan_failed)
+
+    def is_scanning(self) -> bool:
+        return self._scan.is_running()
+
+    def _scan_finished(self) -> None:
+        self.btn_refresh.setText("Refresh")
+        self.btn_refresh.setEnabled(not self._running)
+
+    @Slot(object)
+    def _on_drives_scanned(self, devices) -> None:
+        self._devices = list(devices)
+        prev = (self._target_device.drive_letter.upper()
+                if self._target_device else None)
         self.drive_combo.blockSignals(True)
         self.drive_combo.clear()
         if self._devices:
@@ -482,26 +504,52 @@ class CapacityTab(QWidget):
                 self.drive_combo.addItem(
                     f"{d.drive_letter}  {d.label or 'Removable drive'}"
                     f"  ({d.file_system}, {d.size_human})")
-            self.drive_combo.setCurrentIndex(-1)
+            idx = next((i for i, d in enumerate(self._devices)
+                        if d.drive_letter.upper() == prev), 0)
+            self.drive_combo.setCurrentIndex(idx)
         else:
-            self.drive_combo.addItem("No removable drives detected")
+            idx = -1
+            self.drive_combo.addItem(self.NO_DEVICES_TEXT)
             self.drive_combo.setCurrentIndex(0)
-        self.drive_combo.setEnabled(bool(self._devices))
+        self.drive_combo.setEnabled(bool(self._devices)
+                                    and not self._running)
         self.drive_combo.blockSignals(False)
+        self._scan_finished()
+        if self._running:
+            return
+        if idx >= 0:
+            self._on_drive_pick(idx)
+        else:
+            self._clear_target()
+
+    @Slot(str)
+    def _on_scan_failed(self, message: str) -> None:
+        self._devices = []
+        self.drive_combo.blockSignals(True)
+        self.drive_combo.clear()
+        self.drive_combo.addItem("Drive scan failed — press Refresh")
+        self.drive_combo.setCurrentIndex(0)
+        self.drive_combo.setEnabled(False)
+        self.drive_combo.blockSignals(False)
+        self._scan_finished()
+        self.log("error", f"Removable drive scan failed: {message}")
+        if not self._running:
+            self._clear_target()
+
+    def _clear_target(self) -> None:
+        self._target = None
+        self._target_device = None
+        self.target_label.setText("No target selected")
+        for val in self._info_vals.values():
+            val.setText("—")
+        self.btn_start.setEnabled(False)
+        self.hint_label.setText("No removable USB drive detected — "
+                                "connect one and press Refresh.")
 
     def _on_drive_pick(self, idx: int) -> None:
         if 0 <= idx < len(self._devices):
             d = self._devices[idx]
             self._set_target(d.drive_letter + "\\", device=d)
-
-    def _on_browse(self) -> None:
-        path = QFileDialog.getExistingDirectory(
-            self, "Select target drive or folder")
-        if path:
-            self.drive_combo.blockSignals(True)
-            self.drive_combo.setCurrentIndex(-1)
-            self.drive_combo.blockSignals(False)
-            self._set_target(path)
 
     def _set_target(self, path: str, device=None) -> None:
         if not os.path.isdir(path):
@@ -526,6 +574,7 @@ class CapacityTab(QWidget):
         v["total"].setText(fmt_bytes(total))
         v["used"].setText(fmt_bytes(used))
         v["free"].setText(fmt_bytes(free))
+        self.btn_start.setEnabled(not self._running)
         self.hint_label.setText("Target ready — choose a mode and "
                                 "press Start Test.")
         self.log("info", f"Target selected: {path} "
@@ -993,7 +1042,7 @@ class CapacityTab(QWidget):
         """
         Map the tested drive letter to a positively-identified
         eligible removable USB flash disk. Returns None when the
-        target is a browsed folder or the physical disk cannot be
+        target has no device record or the physical disk cannot be
         verified as an eligible USB flash drive.
         """
         if os.name != "nt" or self._target_device is None:
@@ -1118,12 +1167,13 @@ class CapacityTab(QWidget):
 
     def _set_running(self, running: bool) -> None:
         self._running = running
-        self.btn_start.setEnabled(not running)
+        scanning = self._scan.is_running()
+        self.btn_start.setEnabled(not running and self._target is not None)
         self.btn_stop.setEnabled(running)
         self.btn_clear.setEnabled(not running)
-        self.btn_browse.setEnabled(not running)
-        self.btn_refresh.setEnabled(not running)
-        self.drive_combo.setEnabled(not running and bool(self._devices))
+        self.btn_refresh.setEnabled(not running and not scanning)
+        self.drive_combo.setEnabled(not running and not scanning
+                                    and bool(self._devices))
         for w in (self.rb_full, self.rb_custom, self.rb_quick):
             w.setEnabled(not running)
         custom = self.rb_custom.isChecked() and not running

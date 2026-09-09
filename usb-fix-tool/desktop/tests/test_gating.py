@@ -98,3 +98,5 @@ assert "FA***23" in html_doc and "FAKE123" not in html_doc
 print("6. report masking / fingerprint / ID / disclaimer — OK")
 
 print("ALL GATING TESTS PASSED")
+
+win.close()

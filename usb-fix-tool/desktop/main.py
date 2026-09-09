@@ -98,6 +98,11 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentWidget(self.capacity_tab)
         self.capacity_tab.begin_reverify(ctx)
 
+    def closeEvent(self, event) -> None:
+        for tab in (self.capacity_tab, self.partition_tab, self.repair_tab):
+            tab._scan.shutdown()
+        super().closeEvent(event)
+
     def _on_fix_fake_drive(self, payload: dict) -> None:
         self.tabs.setCurrentWidget(self.partition_tab)
         self.partition_tab.begin_fake_fix(payload)
@@ -160,7 +165,8 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         qss = self._STYLESHEET.replace(
-            "__CHECK_SVG__", _asset_path("check_white.svg"))
+            "__CHECK_SVG__", _asset_path("check_white.svg")).replace(
+            "__CHEVRON_SVG__", _asset_path("chevron_down.svg"))
         self.setStyleSheet(qss)
 
     _STYLESHEET = """
@@ -329,7 +335,13 @@ class MainWindow(QMainWindow):
         QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled {
             color: #adb4bf; background-color: #f2f4f7;
         }
-        QComboBox::drop-down { border: none; width: 20px; }
+        QComboBox::drop-down {
+            subcontrol-origin: padding; subcontrol-position: top right;
+            width: 26px; border-left: 1px solid #c3cad4;
+        }
+        QComboBox::down-arrow {
+            image: url("__CHEVRON_SVG__"); width: 12px; height: 12px;
+        }
         QComboBox QAbstractItemView {
             background-color: #ffffff; color: #1f2530;
             border: 1px solid #c3cad4;

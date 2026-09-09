@@ -225,3 +225,12 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 - Release ZIP: `/app/frontend/public/usb-fix-tool-v2.3.1.zip` (also copied to `usb-fix-tool.zip`), 52 files, no __pycache__/.venv.
   sha256 60bc5138e73615dc4c1dea8f171f02229e71ad08521ca60668911dc6ebe90938
 - Native .exe cannot be cross-built on Linux (no Wine); user builds locally with `build.bat` -> `dist/USBFixTool/USBFixTool.exe`.
+
+
+## v2.3.1 Responsiveness / USB auto-selection fix (2026-09-04)
+- New `desktop/scan_worker.py` (ScanWorker + BackgroundScan: QThread worker, single-flight, done/failed signals, shutdown on window close).
+- Capacity Test: async refresh (Scanning… state, Refresh disabled, duplicates ignored), auto-select 1 device / first of many, preserves same USB across rescans, clears target when none remain, Start disabled without target, redundant "Select Target…" button removed (no workflow needs arbitrary folders).
+- USB Partitions: async list_usb_disks + async verify_identity/list_partitions on selection ("Reading Disk N…"), auto-select, destructive buttons disabled while scanning, `_guard`/`begin_fake_fix` additionally block during scans. Fix Fake Drive gate keeps its synchronous identity re-verification unchanged.
+- Repair Tools: async initial/manual/post-operation refresh with placeholder rows and error state.
+- Stylesheet: explicit QComboBox drop-down + chevron_down.svg arrow.
+- Tests: `tests/test_ui_async_scan.py` (8 scenarios, heartbeat proves GUI not blocked); run_all.sh now 8 suites, ALL PASSED. ZIP rebuilt.

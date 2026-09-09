@@ -80,3 +80,5 @@ assert QApplication.clipboard().text() == "sentinel"
 print("4. guard without FAIL payload — OK")
 
 print("ALL CLAIM-TEXT TESTS PASSED")
+
+win.close()
