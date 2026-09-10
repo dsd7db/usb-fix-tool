@@ -234,3 +234,9 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 - Repair Tools: async initial/manual/post-operation refresh with placeholder rows and error state.
 - Stylesheet: explicit QComboBox drop-down + chevron_down.svg arrow.
 - Tests: `tests/test_ui_async_scan.py` (8 scenarios, heartbeat proves GUI not blocked); run_all.sh now 8 suites, ALL PASSED. ZIP rebuilt.
+
+
+## Page 2 USB detection + Repair row selection fix (2026-09-04)
+- ROOT CAUSE: Windows PowerShell 5.1 ConvertTo-Json emits Get-Disk enums as integers (BusType 7, OperationalStatus 53264, PartitionStyle 1) -> eligibility compared "7" != "USB" -> stick blocked (log warning only). Fix: Get-Disk query stringifies enums via calculated properties + `_enum_name()` normalisation tables in partition_utils.py (works for PS 5.1 and PS 7). Internal/fixed disks still hidden/blocked.
+- Repair Tools table: `QTableWidget::item:selected` (+ `:!active`) now solid #1766c2 with white text; SelectRows/SingleSelection already in place, so any click in a row highlights the full row.
+- New test `tests/test_partition_detection.py` (7 checks); run_all.sh = 9 suites, ALL PASSED. ZIP rebuilt.

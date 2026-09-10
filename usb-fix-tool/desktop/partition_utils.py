@@ -122,6 +122,45 @@ def _extract_vid_pid(pnp_id: str) -> str:
     return ""
 
 
+# Windows PowerShell 5.1 ConvertTo-Json emits Storage-module enums as
+# integers (PowerShell 7 emits names). Normalise both to names.
+_BUS_TYPES = {
+    0: "Unknown", 1: "SCSI", 2: "ATAPI", 3: "ATA", 4: "1394", 5: "SSA",
+    6: "Fibre Channel", 7: "USB", 8: "RAID", 9: "iSCSI", 10: "SAS",
+    11: "SATA", 12: "SD", 13: "MMC", 14: "Virtual",
+    15: "File Backed Virtual", 16: "Storage Spaces", 17: "NVMe",
+}
+_PARTITION_STYLES = {0: "RAW", 1: "MBR", 2: "GPT"}
+_OP_STATUS = {
+    0: "Unknown", 1: "Other", 2: "OK", 3: "Degraded", 6: "Error",
+    10: "Stopped", 0xD010: "Online", 0xD011: "Not Ready",
+    0xD012: "No Media", 0xD013: "Offline", 0xD014: "Failed",
+}
+
+
+def _enum_name(val, table: dict) -> str:
+    val = _first(val)
+    if isinstance(val, (int, float)):
+        return table.get(int(val), str(int(val)))
+    s = str(val or "").strip()
+    if s.isdigit():
+        return table.get(int(s), s)
+    return s
+
+
+_GET_DISK_SCRIPT = (
+    "Get-Disk | Select-Object Number, FriendlyName, SerialNumber,"
+    " @{N='BusType';E={\"$($_.BusType)\"}}, Size,"
+    " @{N='PartitionStyle';E={\"$($_.PartitionStyle)\"}},"
+    " IsBoot, IsSystem, IsReadOnly,"
+    " @{N='OperationalStatus';E={\"$($_.OperationalStatus)\"}},"
+    " LargestFreeExtent | ConvertTo-Json -Compress")
+_WMI_DISK_SCRIPT = (
+    "Get-CimInstance Win32_DiskDrive | Select-Object Index,"
+    " InterfaceType, MediaType, PNPDeviceID, Model |"
+    " ConvertTo-Json -Compress")
+
+
 def list_usb_disks() -> Tuple[List[UsbDisk], int]:
     """
     Returns (usb_candidate_disks, hidden_non_usb_count).
@@ -134,25 +173,19 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
     if os.name != "nt":
         return [], 0
     try:
-        disks_raw = _ps_json(
-            "Get-Disk | Select-Object Number, FriendlyName, SerialNumber,"
-            " BusType, Size, PartitionStyle, IsBoot, IsSystem, IsReadOnly,"
-            " OperationalStatus, LargestFreeExtent |"
-            " ConvertTo-Json -Compress")
-        wmi_raw = _ps_json(
-            "Get-CimInstance Win32_DiskDrive | Select-Object Index,"
-            " InterfaceType, MediaType, PNPDeviceID, Model |"
-            " ConvertTo-Json -Compress")
+        disks_raw = _ps_json(_GET_DISK_SCRIPT)
+        wmi_raw = _ps_json(_WMI_DISK_SCRIPT)
     except Exception:
         return [], 0
 
-    wmi_by_index = {int(w.get("Index", -1)): w for w in wmi_raw}
+    wmi_by_index = {int(w.get("Index", -1)): w for w in wmi_raw
+                    if str(w.get("Index", "")).strip() != ""}
     candidates: List[UsbDisk] = []
     hidden = 0
     for d in disks_raw:
         number = int(d.get("Number", -1))
         wmi = wmi_by_index.get(number, {})
-        bus = str(d.get("BusType") or "")
+        bus = _enum_name(d.get("BusType"), _BUS_TYPES)
         iface = str(wmi.get("InterfaceType") or "")
         if bus.upper() != "USB" and iface.upper() != "USB":
             hidden += 1
@@ -165,11 +198,12 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
             serial=str(d.get("SerialNumber") or "").strip(),
             size_bytes=int(d.get("Size") or 0),
             bus_type=bus,
-            partition_style=str(d.get("PartitionStyle") or ""),
+            partition_style=_enum_name(d.get("PartitionStyle"),
+                                       _PARTITION_STYLES),
             is_boot=bool(d.get("IsBoot")),
             is_system=bool(d.get("IsSystem")),
             is_readonly=bool(d.get("IsReadOnly")),
-            status=str(_first(d.get("OperationalStatus")) or ""),
+            status=_enum_name(d.get("OperationalStatus"), _OP_STATUS),
             largest_free=int(d.get("LargestFreeExtent") or 0),
             interface_type=iface,
             media_type=media,

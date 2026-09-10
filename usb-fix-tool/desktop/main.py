@@ -443,10 +443,12 @@ class MainWindow(QMainWindow):
         QTableWidget::item:hover {
             background-color: rgba(23, 102, 194, 0.06);
         }
-        QTableWidget::item:selected {
-            background-color: rgba(23, 102, 194, 0.16);
-            color: #17202b;
+        QTableWidget::item:selected,
+        QTableWidget::item:selected:!active {
+            background-color: #1766c2;
+            color: #ffffff;
         }
+        QTableWidget::item:selected:hover { background-color: #145bb0; }
         QHeaderView::section {
             background-color: #f2f4f7; color: #6b7585;
             padding: 8px 12px; border: none;
