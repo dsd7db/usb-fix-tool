@@ -250,3 +250,6 @@ monetization integration, (4) 5 SEO blog articles for traffic.
   4. Embedded double quotes removed from Page 2 scripts ([string]$_.X) — no dependency on -Command quote escaping. ConvertTo-Json single-object/null handled via _as_list; _to_int guards.
 - Page 3: no auto-select (never was); device table #deviceTable: gray #e6eaf0 unselected rows, solid #1766c2 + white selected (also when unfocused), alternating colors off. SelectRows/SingleSelection.
 - tests/test_partition_detection.py rewritten (9 checks). run_all.sh 9/9 PASSED. ZIP rebuilt.
+
+## Page 2 Partition Layout row UX (2026-09-04)
+- part_table now objectName "deviceTable" (gray unselected #e6eaf0 / solid blue selected), alternating colors off; no logic changes. Test 10 added to test_partition_detection.py; 9/9 suites PASSED. ZIP rebuilt.

@@ -299,11 +299,12 @@ class PartitionTab(QWidget):
         frame.setMinimumHeight(215)
 
         self.part_table = QTableWidget(0, 6)
+        self.part_table.setObjectName("deviceTable")
         self.part_table.setHorizontalHeaderLabels(
             ["#", "Letter", "Label", "File system", "Type", "Size"])
         self.part_table.verticalHeader().setVisible(False)
         self.part_table.setShowGrid(False)
-        self.part_table.setAlternatingRowColors(True)
+        self.part_table.setAlternatingRowColors(False)
         self.part_table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self.part_table.setSelectionMode(

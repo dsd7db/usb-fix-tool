@@ -233,6 +233,27 @@ def check():
     win.grab().save("/tmp/repair_row1.png")
     print("9b. click anywhere selects full row; selection moves; single "
           "row — OK")
+
+    # ---- 10. Page 2 partition layout uses the same gray/blue row UX ---
+    pt = part.part_table
+    assert pt.objectName() == "deviceTable" and not pt.alternatingRowColors()
+    assert pt.rowCount() == 1 and not pt.selectedIndexes(), "auto-selected"
+    assert pt.selectionBehavior() == pt.SelectionBehavior.SelectRows
+    assert pt.selectionMode() == pt.SelectionMode.SingleSelection
+    assert not part.btn_delete.isEnabled()          # nothing selected yet
+    win.tabs.setCurrentWidget(part)
+    QApplication.processEvents()
+    r = pt.visualRect(pt.model().index(0, 5))
+    pos = r.center()
+    pos.setX(pos.x() + r.width() // 2 - 3)         # whitespace of last cell
+    QTest.mouseClick(pt.viewport(), Qt.MouseButton.LeftButton,
+                     Qt.KeyboardModifier.NoModifier, pos)
+    assert sorted({i.row() for i in pt.selectedIndexes()}) == [0]
+    assert len(pt.selectedIndexes()) == pt.columnCount()
+    assert part.btn_delete.isEnabled()              # gating unchanged
+    win.grab().save("/tmp/partition_row_selected.png")
+    print("10. Partition Layout: gray unselected, full-row blue selection, "
+          "no auto-select — OK")
     win.close()
     print("ALL PARTITION-DETECTION / ROW-SELECTION TESTS PASSED")
     app.quit()
