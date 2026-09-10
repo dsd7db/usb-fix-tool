@@ -95,14 +95,25 @@ class UsbDisk:
 def _ps_json(script: str, timeout: int = 20):
     result = subprocess.run(
         ["powershell", "-NoProfile", "-Command", script],
-        capture_output=True, text=True, timeout=timeout,
+        capture_output=True, text=True, errors="replace", timeout=timeout,
         creationflags=CREATE_NO_WINDOW,
     )
     raw = (result.stdout or "").strip()
     if not raw:
+        if result.returncode != 0 or (result.stderr or "").strip():
+            raise RuntimeError(
+                f"PowerShell exit code {result.returncode}: "
+                f"{(result.stderr or '').strip()[:400] or 'no output'}")
         return []
     data = json.loads(raw)
     return [data] if isinstance(data, dict) else data
+
+
+def _as_list(val) -> list:
+    """ConvertTo-Json emits a bare object for 1 item and null for 0."""
+    if val is None:
+        return []
+    return val if isinstance(val, list) else [val]
 
 
 def _first(val):
@@ -148,17 +159,48 @@ def _enum_name(val, table: dict) -> str:
     return s
 
 
-_GET_DISK_SCRIPT = (
-    "Get-Disk | Select-Object Number, FriendlyName, SerialNumber,"
-    " @{N='BusType';E={\"$($_.BusType)\"}}, Size,"
-    " @{N='PartitionStyle';E={\"$($_.PartitionStyle)\"}},"
+# One PowerShell process for the whole Page 2 enumeration:
+#   disks  = Get-Disk (Storage stack; enums forced to names via [string])
+#   wmi    = Win32_DiskDrive (interface / media / PNP id)
+#   vols   = removable logical volumes (DriveType=2 — the exact query
+#            Capacity Test / Repair Tools use) mapped to disk index
+# No embedded double quotes: nothing depends on -Command quoting rules.
+ENUM_TIMEOUT = 90
+_ENUM_SCRIPT = "; ".join((
+    "$ErrorActionPreference = 'Continue'",
+    "$disks = @(Get-Disk | Select-Object Number, FriendlyName, SerialNumber,"
+    " @{N='BusType';E={[string]$_.BusType}}, Size,"
+    " @{N='PartitionStyle';E={[string]$_.PartitionStyle}},"
     " IsBoot, IsSystem, IsReadOnly,"
-    " @{N='OperationalStatus';E={\"$($_.OperationalStatus)\"}},"
-    " LargestFreeExtent | ConvertTo-Json -Compress")
-_WMI_DISK_SCRIPT = (
-    "Get-CimInstance Win32_DiskDrive | Select-Object Index,"
-    " InterfaceType, MediaType, PNPDeviceID, Model |"
-    " ConvertTo-Json -Compress")
+    " @{N='OperationalStatus';E={[string]$_.OperationalStatus}},"
+    " LargestFreeExtent)",
+    "$wmi = @(Get-CimInstance Win32_DiskDrive | Select-Object Index,"
+    " InterfaceType, MediaType, PNPDeviceID, Model)",
+    "$vols = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=2' |"
+    " ForEach-Object { $ld = $_;"
+    " Get-CimAssociatedInstance -InputObject $ld"
+    " -ResultClassName Win32_DiskPartition -ErrorAction SilentlyContinue |"
+    " ForEach-Object { [PSCustomObject]@{ Letter = $ld.DeviceID;"
+    " DiskIndex = $_.DiskIndex } } })",
+    "[PSCustomObject]@{ disks = $disks; wmi = $wmi; vols = $vols } |"
+    " ConvertTo-Json -Compress -Depth 4",
+))
+
+# Filled on every list_usb_disks() call so the UI can show exactly why
+# each disk was accepted, blocked or hidden.
+last_diagnostics: List[str] = []
+last_error: str = ""
+
+
+def _to_int(val, default: int = -1) -> int:
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return default
+
+
+def _diag(msg: str) -> None:
+    last_diagnostics.append(msg)
 
 
 def list_usb_disks() -> Tuple[List[UsbDisk], int]:
@@ -167,36 +209,77 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
 
     A disk is a candidate if EITHER Get-Disk BusType OR WMI
     InterfaceType says USB. It is `eligible` for destructive
-    operations only if BOTH agree, media is removable, and the disk
-    is not a boot/system disk.
+    operations only if Get-Disk reports the USB bus AND an independent
+    WMI-side confirmation exists (InterfaceType USB, removable media
+    type, or a removable DriveType=2 volume hosted on that disk), the
+    media is removable, and the disk is not a boot/system disk.
     """
+    global last_error
+    last_diagnostics.clear()
+    last_error = ""
     if os.name != "nt":
         return [], 0
     try:
-        disks_raw = _ps_json(_GET_DISK_SCRIPT)
-        wmi_raw = _ps_json(_WMI_DISK_SCRIPT)
-    except Exception:
+        rows = _ps_json(_ENUM_SCRIPT, timeout=ENUM_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        last_error = (f"PowerShell disk enumeration timed out after "
+                      f"{ENUM_TIMEOUT}s (Get-Disk / Storage module too slow)")
+        _diag(f"[diag] {last_error}")
+        return [], 0
+    except Exception as e:
+        last_error = f"Disk enumeration failed: {type(e).__name__}: {e}"
+        _diag(f"[diag] {last_error}")
+        return [], 0
+    payload = rows if isinstance(rows, dict) else (rows[0] if rows else None)
+    if not isinstance(payload, dict):
+        last_error = "PowerShell returned no disk data (empty output)"
+        _diag(f"[diag] {last_error}")
         return [], 0
 
-    wmi_by_index = {int(w.get("Index", -1)): w for w in wmi_raw
-                    if str(w.get("Index", "")).strip() != ""}
+    disks_raw = _as_list(payload.get("disks"))
+    wmi_raw = _as_list(payload.get("wmi"))
+    vols_raw = _as_list(payload.get("vols"))
+    wmi_by_index = {_to_int(w.get("Index")): w for w in wmi_raw
+                    if isinstance(w, dict) and _to_int(w.get("Index")) >= 0}
+    removable_vols: dict = {}
+    for v in vols_raw:
+        if isinstance(v, dict) and _to_int(v.get("DiskIndex")) >= 0:
+            removable_vols.setdefault(_to_int(v.get("DiskIndex")), []).append(
+                str(v.get("Letter") or "?"))
+    _diag(f"[diag] Get-Disk: {len(disks_raw)} disk(s); Win32_DiskDrive: "
+          f"{len(wmi_raw)}; removable volumes (DriveType=2): "
+          + (", ".join(f"{l} -> Disk {n}" for n, ls in
+                       sorted(removable_vols.items()) for l in ls) or "none"))
+
     candidates: List[UsbDisk] = []
     hidden = 0
     for d in disks_raw:
-        number = int(d.get("Number", -1))
+        if not isinstance(d, dict):
+            continue
+        number = _to_int(d.get("Number"))
         wmi = wmi_by_index.get(number, {})
         bus = _enum_name(d.get("BusType"), _BUS_TYPES)
         iface = str(wmi.get("InterfaceType") or "")
-        if bus.upper() != "USB" and iface.upper() != "USB":
-            hidden += 1
-            continue
         media = str(wmi.get("MediaType") or "")
         pnp = str(wmi.get("PNPDeviceID") or "")
+        model = str(d.get("FriendlyName") or wmi.get("Model") or "").strip()
+        vol_letters = removable_vols.get(number, [])
+        facts = (f"Disk {number} '{model or 'unknown'}': bus={bus or '?'} "
+                 f"iface={iface or '?'} media='{media or '?'}' "
+                 f"removable-volume={','.join(vol_letters) or 'none'} "
+                 f"pnp={pnp[:40] or '?'}")
+        bus_usb = bus.upper() == "USB"
+        iface_usb = iface.upper() == "USB"
+        media_removable = "removable" in media.lower()
+        if not bus_usb and not iface_usb:
+            hidden += 1
+            _diag(f"[diag] {facts} -> hidden (not a USB disk)")
+            continue
         disk = UsbDisk(
             number=number,
-            model=str(d.get("FriendlyName") or wmi.get("Model") or "").strip(),
+            model=model,
             serial=str(d.get("SerialNumber") or "").strip(),
-            size_bytes=int(d.get("Size") or 0),
+            size_bytes=_to_int(d.get("Size"), 0),
             bus_type=bus,
             partition_style=_enum_name(d.get("PartitionStyle"),
                                        _PARTITION_STYLES),
@@ -204,19 +287,21 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
             is_system=bool(d.get("IsSystem")),
             is_readonly=bool(d.get("IsReadOnly")),
             status=_enum_name(d.get("OperationalStatus"), _OP_STATUS),
-            largest_free=int(d.get("LargestFreeExtent") or 0),
+            largest_free=_to_int(d.get("LargestFreeExtent"), 0),
             interface_type=iface,
             media_type=media,
             pnp_id=pnp,
             vid_pid=_extract_vid_pid(pnp),
         )
         reason = ""
-        if bus.upper() != "USB":
+        if not bus_usb:
             reason = f"Bus type is {bus or 'unknown'}, not USB"
-        elif iface.upper() != "USB":
+        elif not (iface_usb or media_removable or vol_letters):
             reason = ("WMI cross-check failed: interface type is "
-                      f"{iface or 'unknown'}, not USB")
-        elif "removable" not in media.lower():
+                      f"{iface or 'unknown'}, media type is "
+                      f"'{media or 'unknown'}' and no removable volume "
+                      "is hosted on this disk")
+        elif not (media_removable or vol_letters):
             reason = (f"Media type is '{media or 'unknown'}', not "
                       "removable")
         elif disk.is_boot or disk.is_system:
@@ -225,6 +310,9 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
             reason = f"Disk status is {disk.status}"
         disk.eligible = not reason
         disk.block_reason = reason
+        _diag(f"[diag] {facts} boot={disk.is_boot} system={disk.is_system} "
+              f"status={disk.status or '?'} -> "
+              + ("ELIGIBLE" if disk.eligible else f"BLOCKED: {reason}"))
         candidates.append(disk)
     return candidates, hidden
 
@@ -236,22 +324,24 @@ def list_partitions(disk_number: int) -> List[DiskPartition]:
         f"Get-Partition -DiskNumber {disk_number} -ErrorAction "
         "SilentlyContinue | ForEach-Object { "
         "$v = $_ | Get-Volume -ErrorAction SilentlyContinue; "
-        "[PSCustomObject]@{ N=$_.PartitionNumber; L=\"$($_.DriveLetter)\";"
-        " S=$_.Size; O=$_.Offset; T=\"$($_.Type)\";"
-        " F=\"$($v.FileSystem)\"; B=\"$($v.FileSystemLabel)\" } } |"
+        "[PSCustomObject]@{ N=$_.PartitionNumber; L=[string]$_.DriveLetter;"
+        " S=$_.Size; O=$_.Offset; T=[string]$_.Type;"
+        " F=[string]$v.FileSystem; B=[string]$v.FileSystemLabel } } |"
         " ConvertTo-Json -Compress")
     try:
-        rows = _ps_json(script)
+        rows = _ps_json(script, timeout=60)
     except Exception:
         return []
     parts = []
     for r in rows:
+        if not isinstance(r, dict):
+            continue
         letter = str(r.get("L") or "").strip().strip("\x00")
         parts.append(DiskPartition(
-            number=int(r.get("N") or 0),
+            number=_to_int(r.get("N"), 0),
             drive_letter=letter if letter and letter != " " else "",
-            size_bytes=int(r.get("S") or 0),
-            offset=int(r.get("O") or 0),
+            size_bytes=_to_int(r.get("S"), 0),
+            offset=_to_int(r.get("O"), 0),
             ptype=str(r.get("T") or ""),
             file_system=str(r.get("F") or ""),
             label=str(r.get("B") or ""),
@@ -263,6 +353,8 @@ def verify_identity(expected: UsbDisk
                     ) -> Tuple[bool, str, Optional[UsbDisk]]:
     """Re-enumerate and confirm the SAME removable USB flash drive."""
     disks, _ = list_usb_disks()
+    if last_error:
+        return False, last_error, None
     fresh = next((d for d in disks if d.number == expected.number), None)
     if fresh is None:
         return False, ("USB device disconnected or disk numbering "

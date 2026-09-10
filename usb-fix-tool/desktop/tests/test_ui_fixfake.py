@@ -20,6 +20,8 @@ PARTS = [[{"N": 1, "L": "E", "S": 1099500000000, "O": 1048576,
            "T": "Basic", "F": "FAT32", "B": "FAKE1TB"}]]
 
 def fake_ps(script, timeout=20):
+    if "Win32_LogicalDisk" in script:          # combined Page 2 query
+        return {"disks": GET_DISK, "wmi": WMI, "vols": []}
     if "Get-Disk" in script:
         return GET_DISK
     if "Win32_DiskDrive" in script:

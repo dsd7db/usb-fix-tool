@@ -101,12 +101,13 @@ class RepairTab(QWidget):
         v.addLayout(head)
 
         self.table = QTableWidget(0, 6)
+        self.table.setObjectName("deviceTable")
         self.table.setHorizontalHeaderLabels(
             ["Drive", "Label", "File system", "Size", "Used", "Free"]
         )
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
-        self.table.setAlternatingRowColors(True)
+        self.table.setAlternatingRowColors(False)
         self.table.setSelectionBehavior(
             QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(

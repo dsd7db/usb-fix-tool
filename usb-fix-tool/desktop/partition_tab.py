@@ -541,6 +541,15 @@ class PartitionTab(QWidget):
             self.disk_combo.setCurrentIndex(0)
         self.disk_combo.blockSignals(False)
 
+        for line in partition_utils.last_diagnostics:
+            low = line.lower()
+            level = ("warning" if "blocked" in low else
+                     "error" if "failed" in low or "timed out" in low
+                     or "no disk data" in low else "info")
+            self.log(level, line)
+        if partition_utils.last_error:
+            self.log("error", f"Device enumeration error: "
+                              f"{partition_utils.last_error}")
         if hidden:
             self.log("info", f"{hidden} internal / non-USB disk(s) "
                              "hidden — partition management is "

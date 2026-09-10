@@ -240,3 +240,13 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 - ROOT CAUSE: Windows PowerShell 5.1 ConvertTo-Json emits Get-Disk enums as integers (BusType 7, OperationalStatus 53264, PartitionStyle 1) -> eligibility compared "7" != "USB" -> stick blocked (log warning only). Fix: Get-Disk query stringifies enums via calculated properties + `_enum_name()` normalisation tables in partition_utils.py (works for PS 5.1 and PS 7). Internal/fixed disks still hidden/blocked.
 - Repair Tools table: `QTableWidget::item:selected` (+ `:!active`) now solid #1766c2 with white text; SelectRows/SingleSelection already in place, so any click in a row highlights the full row.
 - New test `tests/test_partition_detection.py` (7 checks); run_all.sh = 9 suites, ALL PASSED. ZIP rebuilt.
+
+
+## Page 2 detection deep-fix + Page 3 row UX correction (2026-09-04)
+- Page 2 pipeline traced end-to-end; defects fixed in partition_utils.py:
+  1. Two separate PowerShell processes (Get-Disk then Win32_DiskDrive), each with a 20 s timeout; Storage-module load on PS 5.1 can exceed that -> TimeoutExpired swallowed -> "No eligible USB" (Pages 1/3 use fast Win32_LogicalDisk). Now ONE process, ENUM_TIMEOUT=90 (async so no freeze).
+  2. All exceptions/empty output were swallowed silently. Now `last_error` + `last_diagnostics` (per-disk facts + verdict) logged in the Page 2 activity log; verify_identity fails closed with the real error.
+  3. Eligibility required Win32_DiskDrive.InterfaceType == "USB"; UASP sticks report "SCSI" -> BLOCKED. Now: BusType USB (Storage stack) AND any WMI-side confirmation (InterfaceType USB, MediaType Removable, or a DriveType=2 volume hosted on the disk — the same query Page 1 uses). Internal SATA/NVMe still hidden.
+  4. Embedded double quotes removed from Page 2 scripts ([string]$_.X) — no dependency on -Command quote escaping. ConvertTo-Json single-object/null handled via _as_list; _to_int guards.
+- Page 3: no auto-select (never was); device table #deviceTable: gray #e6eaf0 unselected rows, solid #1766c2 + white selected (also when unfocused), alternating colors off. SelectRows/SingleSelection.
+- tests/test_partition_detection.py rewritten (9 checks). run_all.sh 9/9 PASSED. ZIP rebuilt.
