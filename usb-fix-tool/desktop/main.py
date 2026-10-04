@@ -459,6 +459,21 @@ class MainWindow(QMainWindow):
         QTableWidget#deviceTable::item:selected:hover {
             background-color: #1766c2; color: #ffffff;
         }
+        /* Partition Layout: row-based only — no cell hover, no focus
+           frame, selected row is one continuous blue rectangle */
+        QTableWidget#partitionTable { outline: 0; }
+        QTableWidget#partitionTable::item,
+        QTableWidget#partitionTable::item:hover {
+            background-color: #e6eaf0; color: #1f2530;
+            border: none; border-bottom: 2px solid #ffffff; outline: 0;
+        }
+        QTableWidget#partitionTable::item:selected,
+        QTableWidget#partitionTable::item:selected:!active,
+        QTableWidget#partitionTable::item:selected:hover,
+        QTableWidget#partitionTable::item:selected:focus {
+            background-color: #1766c2; color: #ffffff;
+            border: none; outline: 0;
+        }
         QHeaderView::section {
             background-color: #f2f4f7; color: #6b7585;
             padding: 8px 12px; border: none;

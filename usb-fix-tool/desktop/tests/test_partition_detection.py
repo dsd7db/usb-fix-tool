@@ -236,13 +236,29 @@ def check():
 
     # ---- 10. Page 2 partition layout uses the same gray/blue row UX ---
     pt = part.part_table
-    assert pt.objectName() == "deviceTable" and not pt.alternatingRowColors()
+    assert pt.objectName() == "partitionTable" and not pt.alternatingRowColors()
+    assert pt.focusPolicy() == Qt.FocusPolicy.NoFocus     # no focus frame
+    qss = win.styleSheet()
+    unsel = qss[qss.index("QTableWidget#partitionTable::item,"):]
+    unsel = unsel[:unsel.index("}")]
+    assert "::item:hover" in unsel and "#e6eaf0" in unsel  # hover == unselected
+    sel = qss[qss.index("QTableWidget#partitionTable::item:selected,"):]
+    sel = sel[:sel.index("}")]
+    assert "#1766c2" in sel and "#ffffff" in sel and "border: none" in sel
+    assert qss.count("#partitionTable::item:hover") == 1  # only in shared rule
+    # hovering must not alter the row's background before a click
+    win.tabs.setCurrentWidget(part)
+    QApplication.processEvents()
+    hover_pos = pt.visualRect(pt.model().index(0, 2)).center()
+    before = pt.viewport().grab().toImage().pixelColor(hover_pos).name()
+    QTest.mouseMove(pt.viewport(), hover_pos)
+    QApplication.processEvents()
+    after = pt.viewport().grab().toImage().pixelColor(hover_pos).name()
+    assert before == after == "#e6eaf0", (before, after)
     assert pt.rowCount() == 1 and not pt.selectedIndexes(), "auto-selected"
     assert pt.selectionBehavior() == pt.SelectionBehavior.SelectRows
     assert pt.selectionMode() == pt.SelectionMode.SingleSelection
     assert not part.btn_delete.isEnabled()          # nothing selected yet
-    win.tabs.setCurrentWidget(part)
-    QApplication.processEvents()
     r = pt.visualRect(pt.model().index(0, 5))
     pos = r.center()
     pos.setX(pos.x() + r.width() // 2 - 3)         # whitespace of last cell
@@ -251,6 +267,13 @@ def check():
     assert sorted({i.row() for i in pt.selectedIndexes()}) == [0]
     assert len(pt.selectedIndexes()) == pt.columnCount()
     assert part.btn_delete.isEnabled()              # gating unchanged
+    # selected row: one continuous blue rectangle, full row height
+    img = pt.viewport().grab().toImage()
+    rr = pt.visualRect(pt.model().index(0, 0))
+    x = pt.visualRect(pt.model().index(0, 3)).center().x()
+    for y in (rr.top() + 1, rr.center().y(), rr.bottom() - 1):
+        assert img.pixelColor(x, y).name() == "#1766c2", (y, img.pixelColor(x, y).name())
+    assert img.pixelColor(x, rr.bottom() + 2).name() == "#ffffff"  # plain bg below
     win.grab().save("/tmp/partition_row_selected.png")
     print("10. Partition Layout: gray unselected, full-row blue selection, "
           "no auto-select — OK")

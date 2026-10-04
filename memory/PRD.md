@@ -253,3 +253,6 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 
 ## Page 2 Partition Layout row UX (2026-09-04)
 - part_table now objectName "deviceTable" (gray unselected #e6eaf0 / solid blue selected), alternating colors off; no logic changes. Test 10 added to test_partition_detection.py; 9/9 suites PASSED. ZIP rebuilt.
+
+## Partition Layout hover/line artifacts (2026-09-04)
+- part_table objectName "partitionTable": hover == unselected (no cell hover), selected rows border:none (no line under row), NoFocus (no focus frame). Test 10 extended (pixel checks). 9/9 PASSED. ZIP rebuilt.
