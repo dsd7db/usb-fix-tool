@@ -263,3 +263,6 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 - partition_tab.py: selection reuses scan result (0 processes); post-op reload = 1 fresh scan preserving selection; begin_fake_fix = 1 enumeration (was 3). capacity_tab.py: begin_reverify uses fresh.partitions; _resolve_fingerprint no longer calls disk_number_for_letter (Get-Partition).
 - Counts for one selection: before 3 Storage-module processes, after 1 (scan) + 0 (select). Backend destructive ops: _pre_check fresh enumeration kept; post-create lookup kept.
 - Tests: new tests/test_enum_count.py (process counts, fresh verify before diskpart, timeout/retry); mocks updated to new payload (parts M/G keys). run_all.sh 10/10 PASSED.
+
+## Repair Tools cell hover removed (2026-09-04)
+- QSS: #deviceTable::item:hover now shares the unselected rule (#e6eaf0); #d9e0ea hover colour removed. Pixel hover check added to test 9a. 10/10 PASSED. ZIP rebuilt.

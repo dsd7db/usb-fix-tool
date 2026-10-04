@@ -222,10 +222,18 @@ def check():
     assert selected_rows() == [], "a row was auto-selected"
     assert rep.table.rowCount() == 2 and not rep.table.alternatingRowColors()
     qss = win.styleSheet()
-    assert "QTableWidget#deviceTable::item {" in qss
-    gray = qss[qss.index("QTableWidget#deviceTable::item {"):]
+    assert "QTableWidget#deviceTable::item," in qss
+    gray = qss[qss.index("QTableWidget#deviceTable::item,"):]
     gray = gray[:gray.index("}")]
-    assert "#e6eaf0" in gray
+    assert "#e6eaf0" in gray and "::item:hover" in gray   # hover == unselected
+    assert "#d9e0ea" not in qss                           # no cell hover colour
+    # hovering a Repair Tools cell must not change its background
+    hp = rep.table.visualRect(rep.table.model().index(1, 2)).center()
+    before = rep.table.viewport().grab().toImage().pixelColor(hp).name()
+    QTest.mouseMove(rep.table.viewport(), hp)
+    QApplication.processEvents()
+    after = rep.table.viewport().grab().toImage().pixelColor(hp).name()
+    assert before == after == "#e6eaf0", (before, after)
     blue = qss[qss.index("QTableWidget#deviceTable::item:selected,"):]
     blue = blue[:blue.index("}")]
     assert "#1766c2" in blue and "#ffffff" in blue and ":!active" in blue

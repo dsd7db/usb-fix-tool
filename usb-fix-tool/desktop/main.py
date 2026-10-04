@@ -450,10 +450,10 @@ class MainWindow(QMainWindow):
         }
         QTableWidget::item:selected:hover { background-color: #145bb0; }
         /* Repair Tools device table: gray = available, blue = selected */
-        QTableWidget#deviceTable::item {
+        QTableWidget#deviceTable::item,
+        QTableWidget#deviceTable::item:hover {
             background-color: #e6eaf0; border-bottom: 2px solid #ffffff;
         }
-        QTableWidget#deviceTable::item:hover { background-color: #d9e0ea; }
         QTableWidget#deviceTable::item:selected,
         QTableWidget#deviceTable::item:selected:!active,
         QTableWidget#deviceTable::item:selected:hover {
