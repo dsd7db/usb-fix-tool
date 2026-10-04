@@ -31,17 +31,19 @@ WMI = [{"Index": 1, "InterfaceType": "USB",
         "MediaType": "Removable Media",
         "PNPDeviceID": "USBSTOR\\DISK&VEN_FAKE", "Model": "Fake"}]
 PARTS = [[{"N": 1, "L": "E", "S": 1099500000000, "O": 1048576,
-           "T": "Basic", "F": "FAT32", "B": "FAKE"}]]
+           "M": 7, "F": "FAT32", "B": "FAKE"}]]
 
 def fake_ps(script, timeout=20):
     if "Win32_LogicalDisk" in script:          # combined Page 2 query
-        return {"disks": GET_DISK, "wmi": WMI, "vols": []}
+        return {"disks": GET_DISK, "wmi": WMI, "vols": [],
+                "parts": [dict(p, D=1) for p in PARTS[0]],
+                "timings": {"disks": 5, "wmi": 3, "vols": 2, "parts": 4}}
     if "Get-Disk" in script:
         return GET_DISK
     if "Win32_DiskDrive" in script:
         return WMI
-    if "Get-Partition" in script:
-        return PARTS[0]
+    if "MSFT_Partition" in script:          # standalone partition query
+        return {"style": "MBR", "parts": PARTS[0]}
     return []
 
 diskpart_calls = []
@@ -51,7 +53,7 @@ def fake_diskpart_ok(script, log):
         PARTS[0] = []                       # partition gone
     if "create partition" in script:
         PARTS[0] = [{"N": 1, "L": "", "S": 30000000000, "O": 1048576,
-                     "T": "Basic", "F": "", "B": ""}]
+                     "M": 7, "F": "", "B": ""}]
     return 0
 
 pu._ps_json = fake_ps
@@ -75,7 +77,7 @@ print("2. orchestrator success path OK — steps:", len(steps),
 
 # --- 3. failure at create -> partial (code 2) ------------------------
 PARTS[0] = [{"N": 1, "L": "E", "S": 1099500000000, "O": 1048576,
-             "T": "Basic", "F": "FAT32", "B": "FAKE"}]
+             "M": 7, "F": "FAT32", "B": "FAKE"}]
 def fake_diskpart_fail_create(script, log):
     if "delete partition" in script:
         PARTS[0] = []
@@ -103,7 +105,7 @@ print("4. protected-partition block OK (no diskpart executed)")
 
 # --- 5. identity change mid-flow aborts -------------------------------
 PARTS[0] = [{"N": 1, "L": "E", "S": 1099500000000, "O": 1048576,
-             "T": "Basic", "F": "FAT32", "B": "FAKE"}]
+             "M": 7, "F": "FAT32", "B": "FAKE"}]
 def diskpart_then_swap(script, log):
     if "delete partition" in script:
         PARTS[0] = []

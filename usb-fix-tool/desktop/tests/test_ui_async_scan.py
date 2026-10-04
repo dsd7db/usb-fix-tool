@@ -42,6 +42,12 @@ def slow_list_usb_drives():
     return list(DEVICES["list"])
 
 
+def make_part():
+    return pu.DiskPartition(number=1, drive_letter="E", size_bytes=10 ** 9,
+                            offset=1048576, ptype="IFS",
+                            file_system="FAT32", label="X")
+
+
 def make_disk(number, serial):
     return pu.UsbDisk(number=number, model=f"Stick {number}",
                       serial=serial, size_bytes=16 * 1024 ** 3,
@@ -50,7 +56,8 @@ def make_disk(number, serial):
                       status="Online", largest_free=0,
                       interface_type="USB", media_type="Removable Media",
                       pnp_id=f"USB\\VID_1&PID_{number}",
-                      vid_pid="VID_1&PID_1", eligible=True)
+                      vid_pid="VID_1&PID_1", eligible=True,
+                      partitions=[make_part()])
 
 
 DISKS = {"list": [make_disk(1, "S1"), make_disk(2, "S2")]}
@@ -62,15 +69,8 @@ def slow_list_usb_disks():
     return list(DISKS["list"]), 1
 
 
-def fake_list_partitions(n):
-    return [pu.DiskPartition(number=1, drive_letter="E", size_bytes=10 ** 9,
-                             offset=1048576, ptype="Basic",
-                             file_system="FAT32", label="X")]
-
-
 usb_utils.list_usb_drives = slow_list_usb_drives
 pu.list_usb_disks = slow_list_usb_disks
-pu.list_partitions = fake_list_partitions
 usb_utils.is_admin = lambda: True
 QMessageBox.warning = staticmethod(
     lambda *a, **k: (_ for _ in ()).throw(AssertionError(f"warning: {a}")))
@@ -232,34 +232,31 @@ def s4_refresh_preserves_selection_then_clears():
 def s5_page2_refresh_and_selection_nonblocking():
     n = CALLS["disks"]
     part.disk_combo.setCurrentIndex(1)              # select disk 2
-    assert part.is_busy()                           # reading in background
-    assert part.status_label.text().startswith("Reading Disk 2")
-    assert not part.btn_refresh.isEnabled()
+    # selection reuses the enumeration: instant, no PowerShell call
+    assert not part.is_busy()
+    assert CALLS["disks"] == n, "selection must not re-enumerate disks"
+    assert part._current.number == 2 and part._current.serial == "S2"
+    assert len(part._partitions) == 1
+    assert part.status_label.text() == "Ready"
+    assert part.disk_combo.isEnabled() and part.btn_refresh.isEnabled()
+    # Refresh: exactly ONE enumeration, disk 2 stays selected, dup ignored
+    m = CALLS["disks"]
+    part.refresh_disks()
+    part.refresh_disks()
+    assert part.is_busy() and part.btn_refresh.text() == "Scanning…"
     assert not part.disk_combo.isEnabled()
-    t = ticks["n"]
+    t2 = ticks["n"]
 
-    def after_pick():
-        expect_responsive(t, "Page 2 disk selection")
-        assert part._current.number == 2 and part._current.serial == "S2"
-        assert part.status_label.text() == "Ready"
-        assert part.disk_combo.isEnabled() and part.btn_refresh.isEnabled()
-        # Refresh: disk 2 stays selected, duplicate ignored
-        m = CALLS["disks"]
-        part.refresh_disks()
-        part.refresh_disks()
-        assert part.is_busy() and part.btn_refresh.text() == "Scanning…"
-        t2 = ticks["n"]
-
-        def after_refresh():
-            expect_responsive(t2, "Page 2 refresh")
-            assert CALLS["disks"] == m + 2, "expected list + inspect only"
-            assert part.disk_combo.currentIndex() == 1
-            assert part._current.number == 2
-            print("5. Page 2 enumeration/selection non-blocking, "
-                  "selection preserved — OK")
-            run_next()
-        wait_until(lambda: not part.is_busy(), after_refresh)
-    wait_until(lambda: not part.is_busy(), after_pick)
+    def after_refresh():
+        expect_responsive(t2, "Page 2 refresh")
+        assert CALLS["disks"] == m + 1, "refresh must enumerate exactly once"
+        assert part.disk_combo.currentIndex() == 1
+        assert part._current.number == 2
+        assert len(part._partitions) == 1
+        print("5. Page 2: selection instant (0 scans), refresh = 1 scan, "
+              "non-blocking, selection preserved — OK")
+        run_next()
+    wait_until(lambda: not part.is_busy(), after_refresh)
 
 
 @step

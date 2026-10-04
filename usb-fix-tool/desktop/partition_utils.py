@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional, Tuple
 
@@ -159,32 +160,96 @@ def _enum_name(val, table: dict) -> str:
     return s
 
 
-# One PowerShell process for the whole Page 2 enumeration:
-#   disks  = Get-Disk (Storage stack; enums forced to names via [string])
-#   wmi    = Win32_DiskDrive (interface / media / PNP id)
-#   vols   = removable logical volumes (DriveType=2 — the exact query
-#            Capacity Test / Repair Tools use) mapped to disk index
+# One PowerShell process for the whole Page 2 enumeration. Uses the
+# Storage WMI provider classes directly (MSFT_Disk / MSFT_Partition /
+# MSFT_Volume in root/Microsoft/Windows/Storage) — the same data
+# Get-Disk / Get-Partition / Get-Volume expose, without importing the
+# Storage cmdlet module in every process. Per-step Stopwatch timings
+# are returned so the UI can report where time is spent.
+#   disks = MSFT_Disk (identity, bus, size, boot/system, status)
+#   wmi   = Win32_DiskDrive (interface / media / PNP id)
+#   vols  = removable logical volumes (DriveType=2 — the exact query
+#           Capacity Test / Repair Tools use) mapped to disk index
+#   parts = partitions (+ volume FS/label) of USB-bus disks only
 # No embedded double quotes: nothing depends on -Command quoting rules.
-ENUM_TIMEOUT = 90
+ENUM_TIMEOUT = 60
+_STORAGE_NS = "root/Microsoft/Windows/Storage"
+_PARTS_SNIPPET = (
+    "Get-CimInstance -Namespace $ns -ClassName MSFT_Partition"
+    " -Filter ('DiskNumber=' + $n) -ErrorAction SilentlyContinue |"
+    " ForEach-Object { $p = $_;"
+    " $v = Get-CimAssociatedInstance -InputObject $p"
+    " -ResultClassName MSFT_Volume -ErrorAction SilentlyContinue |"
+    " Select-Object -First 1;"
+    " [PSCustomObject]@{ D = $p.DiskNumber; N = $p.PartitionNumber;"
+    " L = [string]$p.DriveLetter; S = $p.Size; O = $p.Offset;"
+    " M = $p.MbrType; G = [string]$p.GptType;"
+    " F = [string]$v.FileSystem; B = [string]$v.FileSystemLabel } }")
 _ENUM_SCRIPT = "; ".join((
     "$ErrorActionPreference = 'Continue'",
-    "$disks = @(Get-Disk | Select-Object Number, FriendlyName, SerialNumber,"
-    " @{N='BusType';E={[string]$_.BusType}}, Size,"
-    " @{N='PartitionStyle';E={[string]$_.PartitionStyle}},"
-    " IsBoot, IsSystem, IsReadOnly,"
-    " @{N='OperationalStatus';E={[string]$_.OperationalStatus}},"
+    f"$ns = '{_STORAGE_NS}'",
+    "$sw = [System.Diagnostics.Stopwatch]::StartNew(); $t = @{}",
+    "$disks = @(Get-CimInstance -Namespace $ns -ClassName MSFT_Disk |"
+    " Select-Object Number, FriendlyName, SerialNumber, BusType, Size,"
+    " PartitionStyle, IsBoot, IsSystem, IsReadOnly, OperationalStatus,"
     " LargestFreeExtent)",
+    "$t.disks = $sw.ElapsedMilliseconds; $sw.Restart()",
     "$wmi = @(Get-CimInstance Win32_DiskDrive | Select-Object Index,"
     " InterfaceType, MediaType, PNPDeviceID, Model)",
+    "$t.wmi = $sw.ElapsedMilliseconds; $sw.Restart()",
     "$vols = @(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=2' |"
     " ForEach-Object { $ld = $_;"
     " Get-CimAssociatedInstance -InputObject $ld"
     " -ResultClassName Win32_DiskPartition -ErrorAction SilentlyContinue |"
     " ForEach-Object { [PSCustomObject]@{ Letter = $ld.DeviceID;"
     " DiskIndex = $_.DiskIndex } } })",
-    "[PSCustomObject]@{ disks = $disks; wmi = $wmi; vols = $vols } |"
-    " ConvertTo-Json -Compress -Depth 4",
+    "$t.vols = $sw.ElapsedMilliseconds; $sw.Restart()",
+    "$usbIdx = @($wmi | Where-Object { [string]$_.InterfaceType -eq 'USB' }"
+    " | ForEach-Object { [int]$_.Index })",
+    "$parts = @($disks | Where-Object { [int]$_.BusType -eq 7 -or"
+    " [string]$_.BusType -eq 'USB' -or $usbIdx -contains [int]$_.Number }"
+    " | ForEach-Object { $n = [int]$_.Number; " + _PARTS_SNIPPET + " })",
+    "$t.parts = $sw.ElapsedMilliseconds",
+    "[PSCustomObject]@{ disks = $disks; wmi = $wmi; vols = $vols;"
+    " parts = $parts; timings = $t } | ConvertTo-Json -Compress -Depth 5",
 ))
+
+# Get-Partition's displayed Type is derived from MbrType / GptType.
+_GPT_TYPES = {
+    "{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}": "System",
+    "{e3c9e316-0b5c-4db8-817d-f92df00215ae}": "Reserved",
+    "{ebd0a0a2-b9e5-4433-87c0-68b6b72699c7}": "Basic",
+    "{de94bba4-06d1-4d40-a16a-bfd50179d6ac}": "Recovery",
+    "{5808c8aa-7e8f-42e0-85d2-e1e90434cfb3}": "LDM Metadata",
+    "{af9b60a0-1431-4f62-bc68-3311714a69ad}": "LDM Data",
+    "{e75caf8f-f680-4cee-afa3-b001e56efc2d}": "Storage Spaces",
+}
+_MBR_TYPES = {
+    1: "FAT12", 4: "FAT16", 5: "Extended", 6: "Huge", 7: "IFS",
+    11: "FAT32", 12: "FAT32 XINT13", 14: "XINT13", 15: "Extended XINT13",
+    39: "Recovery", 66: "LDM",
+}
+
+
+def _partition_type(row: dict, style: str) -> str:
+    gpt = str(row.get("G") or "").strip().lower()
+    if style.upper() == "GPT" or gpt:
+        return _GPT_TYPES.get(gpt, "Unknown")
+    return _MBR_TYPES.get(_to_int(row.get("M"), 0), "Unknown")
+
+
+def _parse_partition(row: dict, style: str = "") -> DiskPartition:
+    letter = str(row.get("L") or "").strip().strip("\x00")
+    return DiskPartition(
+        number=_to_int(row.get("N"), 0),
+        drive_letter=letter if letter and letter != " " else "",
+        size_bytes=_to_int(row.get("S"), 0),
+        offset=_to_int(row.get("O"), 0),
+        ptype=_partition_type(row, style),
+        file_system=str(row.get("F") or ""),
+        label=str(row.get("B") or ""),
+    )
+
 
 # Filled on every list_usb_disks() call so the UI can show exactly why
 # each disk was accepted, blocked or hidden.
@@ -219,11 +284,13 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
     last_error = ""
     if os.name != "nt":
         return [], 0
+    t0 = time.monotonic()
     try:
         rows = _ps_json(_ENUM_SCRIPT, timeout=ENUM_TIMEOUT)
     except subprocess.TimeoutExpired:
-        last_error = (f"PowerShell disk enumeration timed out after "
-                      f"{ENUM_TIMEOUT}s (Get-Disk / Storage module too slow)")
+        last_error = (f"Windows disk enumeration did not respond within "
+                      f"{ENUM_TIMEOUT}s (Storage WMI provider hung) — "
+                      "press Refresh to retry")
         _diag(f"[diag] {last_error}")
         return [], 0
     except Exception as e:
@@ -236,9 +303,25 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
         _diag(f"[diag] {last_error}")
         return [], 0
 
+    total_ms = int((time.monotonic() - t0) * 1000)
     disks_raw = _as_list(payload.get("disks"))
     wmi_raw = _as_list(payload.get("wmi"))
     vols_raw = _as_list(payload.get("vols"))
+    parts_raw = _as_list(payload.get("parts"))
+    timings = payload.get("timings") or {}
+    if isinstance(timings, dict):
+        steps_ms = sum(_to_int(timings.get(k), 0)
+                       for k in ("disks", "wmi", "vols", "parts"))
+        _diag(f"[timing] Disk scan {total_ms} ms total in 1 PowerShell "
+              f"process: startup {max(0, total_ms - steps_ms)} ms · "
+              f"MSFT_Disk {_to_int(timings.get('disks'), 0)} ms · "
+              f"Win32_DiskDrive {_to_int(timings.get('wmi'), 0)} ms · "
+              f"removable volumes {_to_int(timings.get('vols'), 0)} ms · "
+              f"partitions {_to_int(timings.get('parts'), 0)} ms")
+    parts_by_disk: dict = {}
+    for r in parts_raw:
+        if isinstance(r, dict) and _to_int(r.get("N"), 0) > 0:
+            parts_by_disk.setdefault(_to_int(r.get("D")), []).append(r)
     wmi_by_index = {_to_int(w.get("Index")): w for w in wmi_raw
                     if isinstance(w, dict) and _to_int(w.get("Index")) >= 0}
     removable_vols: dict = {}
@@ -310,6 +393,8 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
             reason = f"Disk status is {disk.status}"
         disk.eligible = not reason
         disk.block_reason = reason
+        disk.partitions = [_parse_partition(r, disk.partition_style)
+                           for r in parts_by_disk.get(number, [])]
         _diag(f"[diag] {facts} boot={disk.is_boot} system={disk.is_system} "
               f"status={disk.status or '?'} -> "
               + ("ELIGIBLE" if disk.eligible else f"BLOCKED: {reason}"))
@@ -318,43 +403,42 @@ def list_usb_disks() -> Tuple[List[UsbDisk], int]:
 
 
 def list_partitions(disk_number: int) -> List[DiskPartition]:
+    """Standalone partition query (one PowerShell process, no Storage
+    cmdlet module). Prefer UsbDisk.partitions from list_usb_disks()."""
     if os.name != "nt":
         return []
-    script = (
-        f"Get-Partition -DiskNumber {disk_number} -ErrorAction "
-        "SilentlyContinue | ForEach-Object { "
-        "$v = $_ | Get-Volume -ErrorAction SilentlyContinue; "
-        "[PSCustomObject]@{ N=$_.PartitionNumber; L=[string]$_.DriveLetter;"
-        " S=$_.Size; O=$_.Offset; T=[string]$_.Type;"
-        " F=[string]$v.FileSystem; B=[string]$v.FileSystemLabel } } |"
-        " ConvertTo-Json -Compress")
+    script = "; ".join((
+        f"$ns = '{_STORAGE_NS}'", f"$n = {int(disk_number)}",
+        "$style = [string](Get-CimInstance -Namespace $ns -ClassName MSFT_Disk"
+        " -Filter ('Number=' + $n) -ErrorAction SilentlyContinue"
+        ").PartitionStyle",
+        "$parts = @(" + _PARTS_SNIPPET + ")",
+        "[PSCustomObject]@{ style = $style; parts = $parts } |"
+        " ConvertTo-Json -Compress -Depth 4",
+    ))
     try:
-        rows = _ps_json(script, timeout=60)
+        rows = _ps_json(script, timeout=ENUM_TIMEOUT)
     except Exception:
         return []
-    parts = []
-    for r in rows:
-        if not isinstance(r, dict):
-            continue
-        letter = str(r.get("L") or "").strip().strip("\x00")
-        parts.append(DiskPartition(
-            number=_to_int(r.get("N"), 0),
-            drive_letter=letter if letter and letter != " " else "",
-            size_bytes=_to_int(r.get("S"), 0),
-            offset=_to_int(r.get("O"), 0),
-            ptype=str(r.get("T") or ""),
-            file_system=str(r.get("F") or ""),
-            label=str(r.get("B") or ""),
-        ))
+    payload = rows if isinstance(rows, dict) else (
+        rows[0] if rows and isinstance(rows[0], dict) else {})
+    style = _enum_name(payload.get("style"), _PARTITION_STYLES)
+    parts = [_parse_partition(r, style) for r in _as_list(payload.get("parts"))
+             if isinstance(r, dict)]
     return [p for p in parts if p.number > 0]
 
 
-def verify_identity(expected: UsbDisk
+def verify_identity(expected: UsbDisk, disks: Optional[List[UsbDisk]] = None
                     ) -> Tuple[bool, str, Optional[UsbDisk]]:
-    """Re-enumerate and confirm the SAME removable USB flash drive."""
-    disks, _ = list_usb_disks()
-    if last_error:
-        return False, last_error, None
+    """
+    Confirm the SAME removable USB flash drive. With `disks=None` a
+    fresh enumeration is performed (mandatory before destructive
+    operations); callers that just enumerated may pass that result.
+    """
+    if disks is None:
+        disks, _ = list_usb_disks()
+        if last_error:
+            return False, last_error, None
     fresh = next((d for d in disks if d.number == expected.number), None)
     if fresh is None:
         return False, ("USB device disconnected or disk numbering "
@@ -450,7 +534,7 @@ def delete_partition(expected: UsbDisk, partition_number: int,
     fresh = _pre_check(expected, log)
     if fresh is None:
         return 1
-    parts = list_partitions(fresh.number)
+    parts = fresh.partitions
     part = next((p for p in parts if p.number == partition_number), None)
     if part is None:
         log(f"[error] Invalid partition identifier: partition "
@@ -532,7 +616,7 @@ def format_partition(expected: UsbDisk, partition_number: int,
         log(f"[error] Unsupported file system: {fs}. Supported: "
             f"{', '.join(SUPPORTED_FS)}.")
         return 1
-    parts = list_partitions(fresh.number)
+    parts = fresh.partitions
     part = next((p for p in parts if p.number == partition_number), None)
     if part is None:
         log(f"[error] Invalid partition identifier: partition "
@@ -588,7 +672,7 @@ def repair_fake_drive(expected: UsbDisk, size_mb: int, fs: str,
         log("[error] Fix Fake Drive failed: USB identity could not be "
             "verified. No changes were made.")
         return 1
-    parts = list_partitions(fresh.number)
+    parts = fresh.partitions
     protected = [p for p in parts if p.protected]
     if protected:
         log(f"[error] Fix Fake Drive blocked: {len(protected)} "

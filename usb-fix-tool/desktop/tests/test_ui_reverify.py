@@ -18,17 +18,19 @@ WMI = [{"Index": 1, "InterfaceType": "USB",
         "MediaType": "Removable Media",
         "PNPDeviceID": "USB\\VID_ABCD&PID_1234", "Model": "Fake"}]
 PARTS = [[{"N": 1, "L": "E", "S": 1099500000000, "O": 1048576,
-           "T": "Basic", "F": "FAT32", "B": "FAKE1TB"}]]
+           "M": 7, "F": "FAT32", "B": "FAKE1TB"}]]
 
 def fake_ps(script, timeout=20):
     if "Win32_LogicalDisk" in script:          # combined Page 2 query
-        return {"disks": GET_DISK, "wmi": WMI, "vols": []}
+        return {"disks": GET_DISK, "wmi": WMI, "vols": [],
+                "parts": [dict(p, D=1) for p in PARTS[0]],
+                "timings": {"disks": 5, "wmi": 3, "vols": 2, "parts": 4}}
     if "Get-Disk" in script:
         return GET_DISK
     if "Win32_DiskDrive" in script:
         return WMI
-    if "Get-Partition" in script:
-        return PARTS[0]
+    if "MSFT_Partition" in script:          # standalone partition query
+        return {"style": "MBR", "parts": PARTS[0]}
     return []
 
 def fake_diskpart(script, log):
@@ -36,7 +38,7 @@ def fake_diskpart(script, log):
         PARTS[0] = []
     if "create partition" in script:
         PARTS[0] = [{"N": 1, "L": "", "S": 30000000000, "O": 1048576,
-                     "T": "Basic", "F": "", "B": ""}]
+                     "M": 7, "F": "", "B": ""}]
     if "format" in script:
         PARTS[0][0].update(F="exFAT", B="USB", L="E")
     return 0

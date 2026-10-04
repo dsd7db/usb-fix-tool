@@ -46,8 +46,8 @@ WMI_STICK = {"Index": 2, "InterfaceType": "USB", "MediaType": "Removable Media",
              "PNPDeviceID": "USBSTOR\\DISK&VEN_KINGSTON\\VID_0951&PID_1666",
              "Model": "Kingston DataTraveler"}
 VOL_E = {"Letter": "E:", "DiskIndex": 2}
-PARTS = [{"N": 1, "L": "E", "S": 30900000000, "O": 1048576,
-          "T": "Basic", "F": "FAT32", "B": "KINGSTON"}]
+PARTS = [{"D": 2, "N": 1, "L": "E", "S": 30900000000, "O": 1048576,
+          "M": 12, "G": "", "F": "FAT32", "B": "KINGSTON"}]
 SCRIPTS = []
 
 
@@ -55,9 +55,11 @@ def make_ps(payload):
     def fake_ps(script, timeout=20):
         SCRIPTS.append(script)
         if "Win32_LogicalDisk" in script:
-            return payload
-        if "Get-Partition" in script:
-            return PARTS
+            return dict({"parts": PARTS,
+                         "timings": {"disks": 420, "wmi": 80,
+                                     "vols": 30, "parts": 110}}, **payload)
+        if "MSFT_Partition" in script:
+            return {"style": "MBR", "parts": PARTS}
         return []
     return fake_ps
 
@@ -85,6 +87,9 @@ diag = "\n".join(pu.last_diagnostics)
 assert "E: -> Disk 2" in diag and "Disk 2 'Kingston" in diag
 assert "ELIGIBLE" in diag and "Disk 0 'Samsung SSD 970'" in diag
 assert "hidden (not a USB disk)" in diag and not pu.last_error
+assert len(k.partitions) == 1 and k.partitions[0].drive_letter == "E"
+assert k.partitions[0].ptype == "FAT32 XINT13" and not k.partitions[0].protected
+assert "[timing] Disk scan" in diag and "MSFT_Disk 420 ms" in diag
 print("1. PS 5.1 integer enums -> stick eligible, internals hidden, "
       "diagnostics present — OK")
 
@@ -131,9 +136,9 @@ def boom(script, timeout=20):
     raise subprocess.TimeoutExpired(cmd="powershell", timeout=timeout)
 pu._ps_json = boom
 assert pu.list_usb_disks() == ([], 0)
-assert "timed out" in pu.last_error and pu.last_diagnostics
+assert "did not respond" in pu.last_error and pu.last_diagnostics
 ok, reason, fresh = pu.verify_identity(k)
-assert not ok and "timed out" in reason and fresh is None
+assert not ok and "did not respond" in reason and fresh is None
 pu._ps_json = lambda s, timeout=20: []          # empty stdout
 assert pu.list_usb_disks() == ([], 0) and "no disk data" in pu.last_error
 pu._ps_json = lambda s, timeout=20: (_ for _ in ()).throw(
@@ -145,12 +150,22 @@ print("6. timeout / empty / PowerShell error -> last_error, fail closed — OK")
 # ---- 7. the query itself ---------------------------------------------
 q = pu._ENUM_SCRIPT
 assert '"' not in q, "query must not depend on -Command quote escaping"
-assert "[string]$_.BusType" in q and "[string]$_.OperationalStatus" in q
+assert "Get-Disk" not in q and "Get-Partition" not in q and "Get-Volume" not in q
+assert "MSFT_Disk" in q and "MSFT_Partition" in q and "MSFT_Volume" in q
 assert "Win32_LogicalDisk -Filter 'DriveType=2'" in q     # Page 1's query
-assert "Win32_DiskDrive" in q and "Get-Disk" in q
-assert pu.ENUM_TIMEOUT >= 60
-print("7. single-process query: no quotes, enums as names, DriveType=2 "
-      "volume mapping, long timeout — OK")
+assert "Win32_DiskDrive" in q and "Stopwatch" in q
+assert pu.ENUM_TIMEOUT <= 60
+print("7. single-process CIM query: no Storage cmdlets, no quotes, "
+      "DriveType=2 mapping, timings, timeout <= 60 s — OK")
+
+# ---- 7b. partition type mapping (Get-Partition display names) -------
+gpt_sys = {"N": 1, "G": "{c12a7328-f81f-11d2-ba4b-00a0c93ec93b}"}
+assert pu._parse_partition(gpt_sys, "GPT").protected
+assert pu._parse_partition({"N": 2, "G": "{ebd0a0a2-b9e5-4433-87c0-68b6b72699c7}"},
+                           "GPT").ptype == "Basic"
+assert pu._parse_partition({"N": 1, "M": 7}, "MBR").ptype == "IFS"
+assert pu._parse_partition({"N": 1, "M": 131}, "MBR").protected   # unknown
+print("7b. MbrType/GptType -> partition type names, protection intact — OK")
 
 # ---- 8/9. UI: same stick on all three tabs + Repair row UX -----------
 pu._ps_json = make_ps({"disks": [NVME, SATA, STICK],

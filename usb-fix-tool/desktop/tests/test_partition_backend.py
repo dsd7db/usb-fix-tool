@@ -19,7 +19,7 @@ WMI = [
 calls = {"n": 0}
 def fake_ps_json(script, timeout=20):
     if "Win32_LogicalDisk" in script:          # combined Page 2 query
-        return {"disks": GET_DISK, "wmi": WMI, "vols": []}
+        return {"disks": GET_DISK, "wmi": WMI, "vols": [], "parts": []}
     if "Get-Disk" in script:
         return GET_DISK
     if "Win32_DiskDrive" in script:

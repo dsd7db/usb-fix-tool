@@ -827,7 +827,7 @@ class CapacityTab(QWidget):
         self.log("success", f"[ok] Repaired USB identity verified: "
                             f"Disk {fresh.number} — {fresh.model} "
                             f"(S/N {fresh.serial or 'n/a'}).")
-        parts = partition_utils.list_partitions(fresh.number)
+        parts = fresh.partitions
         part = next((p for p in parts
                      if p.file_system and not p.protected), None)
         if part is None:
@@ -1047,13 +1047,10 @@ class CapacityTab(QWidget):
         """
         if os.name != "nt" or self._target_device is None:
             return None
-        disk_no = usb_utils.disk_number_for_letter(
-            self._target_device.drive_letter)
-        if disk_no is None:
-            return None
+        letter = self._target_device.drive_letter.rstrip(":\\").upper()
         disks, _ = partition_utils.list_usb_disks()
-        return next((d for d in disks
-                     if d.number == disk_no and d.eligible), None)
+        return next((d for d in disks if d.eligible and any(
+            p.drive_letter.upper() == letter for p in d.partitions)), None)
 
     def _evaluate_fake_fix(self, r: Dict) -> None:
         verify_errors = r.get("verify_errors", 0)

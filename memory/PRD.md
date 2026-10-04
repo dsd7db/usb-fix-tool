@@ -256,3 +256,10 @@ monetization integration, (4) 5 SEO blog articles for traffic.
 
 ## Partition Layout hover/line artifacts (2026-09-04)
 - part_table objectName "partitionTable": hover == unselected (no cell hover), selected rows border:none (no line under row), NoFocus (no focus frame). Test 10 extended (pixel checks). 9/9 PASSED. ZIP rebuilt.
+
+## Page 2 enumeration timeout fix (2026-09-04)
+- ROOT CAUSE: one Refresh+selection = 3 PowerShell processes each importing the Storage cmdlet module: list_usb_disks (Get-Disk) -> _inspect_disk -> verify_identity -> list_usb_disks AGAIN (Get-Disk #2) -> list_partitions (Get-Partition+Get-Volume). 90 s timeout hit on the redundant 2nd Get-Disk.
+- FIX (partition_utils.py): single process per scan using CIM classes directly (MSFT_Disk/MSFT_Partition/MSFT_Volume in root/Microsoft/Windows/Storage + Win32_DiskDrive + Win32_LogicalDisk DriveType=2) — no Storage module import; partitions of USB disks fetched in the same process (UsbDisk.partitions); Stopwatch timings per step logged as "[timing] ..."; ENUM_TIMEOUT 90->60 with clear "did not respond ... press Refresh to retry" error. verify_identity(expected, disks=None) can compare against an enumeration just taken (UI gate); with disks=None (backend _pre_check before every diskpart) it always re-enumerates fresh. Partition type derived from MbrType/GptType (Get-Partition display names) so protected checks unchanged.
+- partition_tab.py: selection reuses scan result (0 processes); post-op reload = 1 fresh scan preserving selection; begin_fake_fix = 1 enumeration (was 3). capacity_tab.py: begin_reverify uses fresh.partitions; _resolve_fingerprint no longer calls disk_number_for_letter (Get-Partition).
+- Counts for one selection: before 3 Storage-module processes, after 1 (scan) + 0 (select). Backend destructive ops: _pre_check fresh enumeration kept; post-create lookup kept.
+- Tests: new tests/test_enum_count.py (process counts, fresh verify before diskpart, timeout/retry); mocks updated to new payload (parts M/G keys). run_all.sh 10/10 PASSED.

@@ -56,12 +56,6 @@ LOG_COLORS = {
 }
 
 
-def _inspect_disk(disk):
-    """Worker-side: re-verify identity, then read the partition layout."""
-    ok, reason, fresh = partition_utils.verify_identity(disk)
-    parts = partition_utils.list_partitions(fresh.number) if ok else []
-    return ok, reason, fresh, parts
-
 
 class FixFakeDriveDialog(QDialog):
     """Repair preview + explicit confirmation for Fix Fake Drive."""
@@ -534,7 +528,13 @@ class PartitionTab(QWidget):
                     f"Disk {d.number} — {d.model} "
                     f"({fmt_bytes(d.size_bytes)})")
             idx = next((i for i, d in enumerate(eligible)
-                        if (d.number, d.serial, d.size_bytes) == prev), 0)
+                        if (d.number, d.serial, d.size_bytes) == prev), -1)
+            if idx < 0 and prev is not None:
+                self.log("warning", "Previously selected USB device is "
+                                    "no longer present or its identity "
+                                    "changed — select a device again.")
+            elif idx < 0:
+                idx = 0
             self.disk_combo.setCurrentIndex(idx)
         else:
             idx = -1
@@ -591,50 +591,23 @@ class PartitionTab(QWidget):
 
     def _on_disk_pick(self, idx: int) -> None:
         if 0 <= idx < len(self._disks):
-            self._current = self._disks[idx]
-            d = self._current
+            d = self._disks[idx]
             self.log("info", f"USB device selected: Disk {d.number} — "
                              f"{d.model} (S/N {d.serial or 'n/a'}, "
                              f"{fmt_bytes(d.size_bytes)}).")
-            self._reload_current()
+            self._apply_inspection(True, "", d, d.partitions)
+            text, tone = self._status_after_scan or ("Ready", "idle")
+            self._status_after_scan = None
+            self._set_status(text, busy=False, tone=tone)
+            self._render_device_info()
+            self._render_partitions()
+            self._update_buttons()
 
     def _reload_current(self) -> None:
-        """Re-query the selected disk and its partitions from the OS."""
+        """Fresh rescan of the OS state, keeping the current selection."""
         if not self._current or self._scan.is_running():
             return
-        self._set_status(f"Reading Disk {self._current.number}…",
-                         busy=True, tone="busy")
-        self._scan.start(_inspect_disk, self._current,
-                         on_done=self._on_inspected,
-                         on_error=self._on_inspect_failed)
-        self._set_scanning(True)
-
-    @Slot(object)
-    def _on_inspected(self, result) -> None:
-        ok, reason, fresh, parts = result
-        self._apply_inspection(ok, reason, fresh, parts)
-        self._set_scanning(False)
-        text, tone = self._status_after_scan or ("Ready", "idle")
-        self._status_after_scan = None
-        if not ok:
-            text, tone = ("USB identity verification failed — see the "
-                          "activity log", "err")
-        self._set_status(text, busy=False, tone=tone)
-        self._render_device_info()
-        self._render_partitions()
-        self._update_buttons()
-
-    @Slot(str)
-    def _on_inspect_failed(self, message: str) -> None:
-        self.log("error", f"Reading the USB device failed: {message}")
-        self._current = None
-        self._partitions = []
-        self._set_scanning(False)
-        self._set_status("Reading the USB device failed — press "
-                         "Refresh", busy=False, tone="err")
-        self._render_device_info()
-        self._render_partitions()
-        self._update_buttons()
+        self.refresh_disks()
 
     def _apply_inspection(self, ok, reason, fresh, parts) -> None:
         if not ok:
@@ -933,7 +906,12 @@ class PartitionTab(QWidget):
                 "(right-click → Run as administrator).")
             return
         fp = payload["fingerprint"]
-        ok, reason, fresh = partition_utils.verify_identity(fp)
+        self.log("info", "Scanning for removable USB flash drives...")
+        disks, hidden = partition_utils.list_usb_disks()
+        ok, reason, fresh = (
+            (False, partition_utils.last_error, None)
+            if partition_utils.last_error
+            else partition_utils.verify_identity(fp, disks))
         if not ok:
             self.log("error", f"USB identity verification failed — "
                               f"repair aborted. {reason}")
@@ -955,11 +933,11 @@ class PartitionTab(QWidget):
                             f"Disk {fresh.number} — {fresh.model} "
                             f"(S/N {fresh.serial or 'n/a'}).")
 
-        # Select the verified disk in this tab's own device list
-        # (synchronous rescan: this is a destructive-workflow gate).
-        self.log("info", "Scanning for removable USB flash drives...")
+        # Select the verified disk in this tab's own device list from
+        # the enumeration just taken (destructive-workflow gate; the
+        # backend re-verifies identity again before diskpart runs).
         self._prev_identity = None
-        self._apply_disks(*partition_utils.list_usb_disks())
+        self._apply_disks(disks, hidden)
         idx = next((i for i, d in enumerate(self._disks)
                     if d.number == fresh.number
                     and d.serial == fresh.serial
@@ -978,15 +956,7 @@ class PartitionTab(QWidget):
         self.disk_combo.blockSignals(True)
         self.disk_combo.setCurrentIndex(idx)
         self.disk_combo.blockSignals(False)
-        self._current = self._disks[idx]
-        d = self._current
-        self.log("info", f"USB device selected: Disk {d.number} — "
-                         f"{d.model} (S/N {d.serial or 'n/a'}, "
-                         f"{fmt_bytes(d.size_bytes)}).")
-        self._apply_inspection(*_inspect_disk(self._current))
-        self._render_device_info()
-        self._render_partitions()
-        self._update_buttons()
+        self._on_disk_pick(idx)
 
         dlg = FixFakeDriveDialog(self, self._current or fresh,
                                  self._partitions, payload)
