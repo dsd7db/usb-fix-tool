@@ -7,7 +7,7 @@ Read [SAFETY](SAFETY.md) first and [install the desktop app](INSTALLATION.md). W
 1. Connect the intended drive, wait for the background scan, then use Refresh if necessary.
 2. Select the target and verify its letter, label and capacity. Close other applications writing to it.
 3. Choose Full capacity test, Custom size, or Quick verification (1 GB sample). Full means testable free space; Quick is at most 1 GiB. A partial test cannot establish the full capacity.
-4. If matching leftover test files are found, inspect them before approving cleanup. Choose whether to retain test files if the UI offers that option.
+4. If matching leftover test files are found, inspect them before approving cleanup.
 5. Start Test and let both writing and verification finish. Use Stop Test and its confirmation if needed; allow cleanup to complete.
 6. Read tested/verified/corrupted amounts, errors and the activity log. A stopped or errored run is incomplete. A PASS applies only to the tested bytes.
 

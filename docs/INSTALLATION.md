@@ -49,19 +49,21 @@ PyInstaller and PySide6 are not fully pinned; the spec contains tool-version-sen
 
 ## Desktop regression scripts
 
-These are standalone Python scripts, not a conventional pytest-only suite. Review each script before executing it. The existing Bash runner sets Qt offscreen and invokes ten scripts; UI scripts use the Unix `timeout` command. In a compatible Bash/Python environment with PySide6 installed, from the desktop directory:
+These are standalone Python scripts, not a conventional pytest-only suite. The checked-in scripts hard-code imports from `/app/usb-fix-tool/desktop`; several also write and recursively remove fixed `/tmp/st_*` directories. The Bash runner sets Qt offscreen and uses Unix `timeout`. They are not directly portable Windows test commands.
+
+Use an isolated disposable development environment with the checkout mounted at `/app`, Python/PySide6 installed and no valuable files in the fixed scratch locations. Review every script before running. From `/app/usb-fix-tool/desktop` in that environment:
 
 ```sh
 bash tests/run_all.sh
 ```
 
-For a focused, non-GUI engine check from the desktop directory:
+A focused engine check in the same environment is:
 
-```bat
-.venv\Scripts\python.exe tests\test_engine.py
+```sh
+python tests/test_engine.py
 ```
 
-The regression scripts use temporary test data and mocked Windows operations in relevant cases. Passing them does not establish real-device safety or successful Windows packaging. Use only disposable, backed-up media for any explicitly planned hardware validation.
+Do not run these scripts against a shared scratch directory containing other data. Relevant backend tests mock Windows commands, but passing them does not establish real-device safety or successful Windows packaging. Use only disposable, backed-up media for any explicitly planned hardware validation. No test run is claimed by this documentation change.
 
 ## Static website
 

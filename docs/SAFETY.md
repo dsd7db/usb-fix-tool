@@ -13,7 +13,7 @@ UI confirmations and software filters reduce risk; they do not replace backups o
 
 | Action | Actual effect and risk |
 | --- | --- |
-| Capacity Test / re-verification | Creates deterministic test files in filesystem free space, flushes and reads them back. Normally removes generated files unless retention is selected. Writes can overwrite aliased existing data on counterfeit media, fill space, stress failing storage or leave files after interruption. |
+| Capacity Test / re-verification | Creates deterministic test files in filesystem free space, flushes and reads them back. Normally removes generated files; the engine also has a keep-files option, which the current UI does not expose. Writes can overwrite aliased existing data on counterfeit media, fill space, stress failing storage or leave files after interruption. |
 | CHKDSK | Runs with `/F /R /X`: repairs filesystem metadata, scans for bad sectors and forces dismount where needed. This changes the filesystem and can affect damaged files; it is not a read-only diagnostic. |
 | Format | Erases the selected volume's filesystem contents. Quick format is not secure erasure. |
 | Delete partition | Removes the selected partition and access to its files. |
