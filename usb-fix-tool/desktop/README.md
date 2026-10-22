@@ -1,134 +1,59 @@
-# USB Fix Tool — Desktop App
+# USB Fix Tool — Windows Desktop App
 
-Professional storage verification & repair utility for Windows,
-built with **PySide6**.
+Python/PySide6 desktop utility with three UI tabs: **Capacity Test**, **USB Partitions**, and **Repair Tools**. `main.py` identifies the current app as **2.3.1**. The code targets Windows; enumeration and repair operations depend on built-in Windows utilities.
 
-## Features
+[Project overview](../../README.md) · [User guide](../../docs/USER_GUIDE.md) · [Safety](../../docs/SAFETY.md) · [Build instructions](../../docs/DEVELOPMENT.md)
 
-### Capacity Test (H2testw-style, v2.0)
-- Real write + verify testing: fills the target with deterministic
-  test data, fsyncs, reads it back and compares byte-for-byte
-- Detects **fake capacity**, corrupted sectors and read/write errors
-- Test modes: **Full capacity**, **Custom size**, **Quick (1 GB sample)**
-- Live progress: phase, %, data written/verified, real write/read
-  speeds, elapsed & estimated remaining time, error counters
-- Color-coded timestamped activity log
-- Clear **PASS / FAIL** result panel with tested/verified/lost
-  capacity, error counts, average speeds and duration
-- Test files are written to free space only and deleted afterwards —
-  existing files are never touched
+## Capabilities verified from source
 
-### Re-verify Repaired Drive & Reports (v2.3)
-- After a fully successful Fix Fake Drive, a **Re-verify Repaired
-  Drive** action appears (never after failed/partial repairs)
-- Re-verification re-checks the exact same physical USB (identity
-  re-verified), locates the repaired partition, confirms it is
-  accessible, then runs the existing real Full Capacity Test after
-  user confirmation
-- A genuine PASS unlocks a **Verification Certificate**; a FAILED
-  fake-capacity test can export a **Proof Report** for refund claims
-- Reports are privacy-safe (masked serial + SHA-256 device
-  fingerprint), print-ready HTML (browser Print → Save as PDF),
-  carry a locally generated report ID, and explicitly state they are
-  not an official/legal certification
+**Capacity Test**
+- Writes deterministic data to files in free space, flushes and reads it back, and checks for mismatches.
+- Modes: Full available free-space test, Custom size, and up-to-1-GiB Quick sample.
+- Progress, measured read/write speeds, errors, and PASS/FAIL/STOPPED states.
+- On qualifying failures: fake-capacity estimate, proof HTML export and claim text.
+- After successful repair and Full re-verification: local HTML verification certificate.
 
-### Fix Fake Drive (v2.2)
-- A FAILED Full-capacity test on a verified removable USB flash
-  drive offers a one-click **Fix Fake Drive** action
-- The verified contiguous usable capacity comes only from the real
-  test result (first corruption offset); advertised capacity is
-  never used
-- A conservative safety margin (max of 64 MiB / 1%) is applied and
-  both values are shown; the user can only reduce the size
-- Full repair preview (device identity, capacities, partitions to be
-  deleted, final layout) with explicit confirmation before anything
-  is erased
-- Multi-step repair (verify identity → delete partitions → create
-  safe partition → format) with real step-based progress; identity
-  is re-verified before every destructive step; partial failures are
-  reported honestly with recovery guidance
+**USB Partitions**
+- Enumerates eligible removable USB flash disks using Windows physical-disk information.
+- Shows partition layout and unallocated space, creates/deletes partitions and formats FAT32/exFAT/NTFS.
+- Rechecks physical disk identity before destructive actions; protects recognized system/EFI/recovery/reserved partitions and detected write-protected devices.
+- Provides a guarded Fix Fake Drive flow after qualifying failed full-capacity tests; operations can leave a partial layout on failure.
 
-### USB Partition Management (v2.1)
-- Exclusively for positively-identified **removable USB flash
-  drives** — internal HDD/SSD/NVMe, boot/system disks, SD bus and
-  virtual disks are never listed and are blocked again at execution
-  time (Get-Disk BusType + Win32_DiskDrive cross-check, removable
-  media, VID/PID, serial, model, capacity)
-- Inspect real partition layout, delete partitions, view unallocated
-  space, create partitions (max or custom size), format
-  (FAT32 ≤32 GB / exFAT / NTFS, quick or full)
-- USB identity is re-verified in the backend immediately before every
-  destructive operation; identity change or ambiguity aborts the
-  operation
-- Real diskpart output is scanned for failure markers — success is
-  never reported after an access-denied / VDS error
-- Protected partitions (System/EFI/Recovery/Reserved) cannot be
-  deleted or formatted; write-protected drives are blocked
+**Repair Tools**
+- Shows removable logical drives, with CHKDSK, Format, Advanced Repair (DiskPart `clean` + repartition + format), and Assign Letter.
+- Displays Windows command output in a log; uses confirmation steps for Format and Advanced Repair.
+- **Different safety boundary:** the Repair Tools implementation is based on drive-letter enumeration and mapped disk numbers, **not the same per-operation device fingerprint revalidation** as USB Partitions.
 
-### Repair Tools
-- Detect connected USB drives (drive letter, label, file system, size)
-- Run **CHKDSK** repair (`/F /R /X`)
-- **Format** as FAT32 / exFAT / NTFS with custom label
-- **Advanced repair** — clean disk + create partition + format (diskpart)
-- **Assign drive letter**
-- Live log console of every command
-- "Recover Lost Files" link → external recovery-software page
+**Never use destructive commands without backups and independent disk identification.** CHKDSK also modifies the file system and may stress a failing device.
 
-## Safety
+## Run locally on Windows
 
-- The app refuses destructive actions until you tick the confirmation
-  checkbox **and** confirm a second dialog.
-- Stopping a running capacity test asks for confirmation.
-- Repair actions must be run as administrator. The UAC prompt appears
-  automatically when launching the built `.exe`.
-
-## Run from source
-
-```bash
-python -m venv .venv
-.venv\Scripts\activate           # Windows
-pip install -r requirements.txt
-python main.py
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
 ```
 
-> On Linux/macOS the GUI still launches (handy for development),
-> but the Windows-specific commands return empty results.
+Run these commands inside this `desktop/` directory. The alternative `run.bat` bootstraps and launches the source application. The declared Python package requirement is `PySide6>=6.6,<7.0`; Python 3.10+ is required by the provided batch scripts.
 
-## Build a standalone `.exe`
-
-On a Windows machine:
+## Build executable
 
 ```bat
 build.bat
 ```
 
-This produces `dist\USBFixTool\USBFixTool.exe`. Distribute the whole
-`USBFixTool` folder (it contains the required Qt DLLs).
+Expected location on success: `dist\USBFixTool\USBFixTool.exe`. Keep the **whole output folder**; PyInstaller is configured for a one-folder distribution with `uac_admin=True` and UPX disabled. Code signing, actual build success, archive size and downloadable artifacts have **not** been verified as part of this documentation edit.
 
-### Antivirus notes
+## Test scripts
 
-- We deliberately ship as a **folder**, not a single-file exe — single-file
-  PyInstaller builds extract to `%TEMP%` and are routinely flagged.
-- UPX is **disabled** in `build.spec` for the same reason.
-- The bundled manifest requests admin rights honestly via UAC; no token
-  tricks or process injection.
+The `tests/` directory contains engine, partition, fake-capacity, reporting/gating and UI tests. Run an individual script from this directory using the environment's Python, e.g.:
 
-## File layout
-
-```
-desktop/
-├── main.py          # PySide6 UI
-├── usb_utils.py     # USB enumeration + command wrappers
-├── requirements.txt
-├── build.spec       # PyInstaller config
-├── build.bat        # one-click Windows build
-└── README.md
+```powershell
+.\.venv\Scripts\python.exe tests\test_engine.py
 ```
 
-## Configure the affiliate link
+`tests/run_all.sh` defines an additional headless sequence in an environment with Bash, `timeout`, PySide6 and the required platform facilities. **The suite was not run during this documentation change.**
 
-Open `main.py` and replace the value of `AFFILIATE_URL`:
+## Important implementation files
 
-```python
-AFFILIATE_URL = "https://your-affiliate-link.example/?ref=usbfixtool"
-```
+`main.py` (entry), `capacity_tab.py` and `storage_test.py` (verification), `partition_tab.py` and `partition_utils.py` (USB disk management), `repair_tab.py` and `usb_utils.py` (general repair), `report.py` (HTML reports), `scan_worker.py` (background enumeration), and `build.spec` (packaging).

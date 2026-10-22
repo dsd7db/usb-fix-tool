@@ -1,120 +1,41 @@
-# USB Fix Tool
+# USB Fix Tool — Desktop and Static Website
 
-A complete, self-contained project for the **USB Fix Tool** brand:
+This subdirectory contains the primary **Windows Python/PySide6 desktop application** and the separate **static informational website**.
 
-- **`desktop/`** — A small, transparent Windows USB-repair utility
-  (Python + PySide6) that wraps `chkdsk`, `format` and `diskpart`
-  behind a clean dark interface.
-- **`website/`** — Static, SEO-optimised marketing site (Home,
-  Download, Blog, 5 long-form articles).
-- Built-in monetization hooks: affiliate CTA in the desktop app,
-  affiliate sections in every blog article, AdSense placeholder slots
-  on every web page.
+For the public project overview, start with the [repository README](../README.md).
 
-```
-usb-fix-tool/
-├── desktop/                # PySide6 Windows app
-│   ├── main.py
-│   ├── usb_utils.py
-│   ├── requirements.txt
-│   ├── build.spec          # PyInstaller config
-│   ├── build.bat           # one-click Windows builder
-│   └── README.md
-├── website/                # static HTML/CSS/JS site
-│   ├── index.html
-│   ├── download.html
-│   ├── blog.html
-│   ├── blog/
-│   │   ├── usb-not-recognized-fix.html
-│   │   ├── repair-corrupted-usb.html
-│   │   ├── usb-0-bytes-fix.html
-│   │   ├── fix-raw-usb-drive.html
-│   │   └── best-usb-repair-tools.html
-│   ├── css/style.css
-│   ├── js/main.js
-│   ├── robots.txt
-│   ├── sitemap.xml
-│   └── README.md
-└── README.md               # this file
+## Components
+
+- [`desktop/`](desktop/README.md): a Windows GUI with Capacity Test, USB Partitions and Repair Tools tabs. Capacity verification writes and reads real data. Storage repairs use Windows utilities and can be destructive.
+- [`website/`](website/README.md): static HTML, CSS and JavaScript for a home page, download page, blog index and six article pages. Website links and promotional information still need publication review.
+- [`WINDOWS-QUICKSTART.txt`](WINDOWS-QUICKSTART.txt): a source/builder quick-start. The application's version constant remains `2.3.1`.
+
+## Run the Windows application
+
+From the repository root in Windows PowerShell:
+
+```powershell
+cd usb-fix-tool\desktop
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py
 ```
 
-## Quick start
+Or open that directory and run `run.bat`. To compile a one-folder Windows executable from `desktop/`, run `build.bat`. The configured build output is `desktop\dist\USBFixTool\USBFixTool.exe` plus its companion files.
 
-### 1. Run the desktop app from source
+For safe usage, consult the [User guide](../docs/USER_GUIDE.md) and [Safety and data loss](../docs/SAFETY.md) **before** any formatting or partition modification.
 
-> Works on Windows 10 / 11. The Linux/macOS UI loads but Windows-only
-> commands return empty results.
+## Preview the static site
 
-```bash
-cd desktop
-python -m venv .venv
-.venv\Scripts\activate          # Windows
-pip install -r requirements.txt
-python main.py
+From the repository root:
+
+```powershell
+cd usb-fix-tool\website
+py -3 -m http.server 8080
 ```
 
-### 2. Build a standalone `.exe` (Windows only)
+Browse to <http://localhost:8080>. **Do not publish as-is:** the current HTML includes demonstration links, sample marketing claims and inconsistent version references that need manual verification/correction.
 
-```bat
-cd desktop
-build.bat
-```
+## Licensing
 
-The result lives in `desktop\dist\USBFixTool\USBFixTool.exe`. Ship the
-whole `USBFixTool` folder.
-
-### 3. Preview the website
-
-```bash
-cd website
-python3 -m http.server 8080
-# open http://localhost:8080
-```
-
-### 4. Deploy the website
-
-Any static host. Netlify drag-and-drop is the fastest path; see
-`website/README.md` for Vercel / GitHub Pages / Cloudflare Pages
-instructions.
-
-## Monetization checklist
-
-Before going live, swap these placeholders site- and app-wide:
-
-| Where | What to replace |
-| --- | --- |
-| `desktop/main.py` → `AFFILIATE_URL` | Your affiliate URL |
-| Every `*.html` → `https://example.com/recover?ref=usbfixtool` | Your affiliate URL |
-| Every `*.html` → `https://example.com/...` (canonical/og) | Your real domain |
-| `<head>` AdSense placeholder | Your `ca-pub-XXXXXXXXXX` ID |
-| `<head>` Analytics placeholder | Your `G-XXXXXXX` GA4 ID |
-| `download.html` → `USBFixTool-1.0.0-win64.zip` | Real download URL + SHA-256 |
-
-## Antivirus & safety
-
-The desktop app is built to be transparent and AV-friendly:
-
-- No obfuscation, no packing — UPX is explicitly disabled in
-  `build.spec`.
-- Ships as a folder of normal files, not a single-file PyInstaller
-  bundle (which extracts to `%TEMP%` and gets flagged).
-- Uses Windows' own commands (`chkdsk`, `format`, `diskpart`) — no
-  raw disk I/O, no kernel tricks.
-- Requires an honest UAC prompt for elevation; no token manipulation.
-- Logs every command and its full output to the in-app console.
-
-If you self-publish a signed build, code-signing the `.exe` removes
-the SmartScreen warning that appears on unsigned installers.
-
-## Roadmap ideas
-
-- Bootable rescue ISO builder.
-- Drive health (S.M.A.R.T.-equivalent for USB controllers).
-- Localized site (es, pt, hi) for organic traffic in non-EN markets.
-- Email capture on `download.html` for a "USB tips" newsletter.
-
-## License
-
-Source available under the MIT License — feel free to fork, rebrand
-and ship your own version. Affiliate placeholders are stubs; replace
-them with your own program before publishing.
+There is **no `LICENSE` file at repository root**. An older description of the project asserted an MIT license without a corresponding license file. That assertion has been removed; do not assume any redistribution permission until the maintainer supplies applicable licensing terms.

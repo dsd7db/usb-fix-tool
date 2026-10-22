@@ -1,87 +1,48 @@
-# USB Fix Tool — Website
+# USB Fix Tool — Static Website
 
-Static, SEO-optimized marketing site for USB Fix Tool. No build step,
-no framework — just HTML, CSS and a tiny JS file. Deploy by copying
-the folder to any static host.
+The website in this folder is **plain HTML, CSS and JavaScript**. It is separate from the Windows desktop program and does not need the repository's React/FastAPI scaffolding.
 
-## Pages
+## Pages present
 
-| Path | Purpose |
-| --- | --- |
-| `index.html` | Home — headline, features, CTA, blog teasers |
-| `download.html` | Download CTA, install steps, safety reassurance |
-| `blog.html` | Blog index |
-| `blog/usb-not-recognized-fix.html` | SEO article #1 |
-| `blog/repair-corrupted-usb.html` | SEO article #2 |
-| `blog/usb-0-bytes-fix.html` | SEO article #3 |
-| `blog/fix-raw-usb-drive.html` | SEO article #4 |
-| `blog/best-usb-repair-tools.html` | SEO article #5 |
-| `robots.txt` / `sitemap.xml` | SEO basics |
+- `index.html` — landing page
+- `download.html` — proposed download page
+- `blog.html` — article index
+- `blog/best-usb-repair-tools.html`
+- `blog/detect-fake-usb-drives.html`
+- `blog/fix-raw-usb-drive.html`
+- `blog/repair-corrupted-usb.html`
+- `blog/usb-0-bytes-fix.html`
+- `blog/usb-not-recognized-fix.html`
+- `css/style.css`, `js/main.js`, `assets/`, `robots.txt`, `sitemap.xml`
 
-## Local preview
+## Preview locally
 
-```bash
-cd website
-python3 -m http.server 8080
-# visit http://localhost:8080
+From this folder:
+
+```powershell
+py -3 -m http.server 8080
 ```
 
-Or open `index.html` directly in your browser — there's no server
-logic needed.
+Open <http://localhost:8080>. The site can also be opened by loading `index.html` in a browser, but an HTTP server more closely resembles production hosting.
 
-## Deploy
+For a static host, publish the contents of this `website/` directory as the **site root**. No package build is configured for this site.
 
-Any static host works. Easiest options:
+## Publication checklist — do not deploy unchanged
 
-### Netlify (drag-and-drop)
+The checked-in pages include development placeholders and marketing text that must be corrected and independently checked before publication:
 
-1. Sign in at <https://app.netlify.com/>.
-2. Drag the `website/` folder onto the dashboard.
-3. Done — you get a `*.netlify.app` URL instantly. Add a custom
-   domain in *Site settings → Domain management*.
+1. Replace `example.com` URLs used for canonical, Open Graph, affiliate and download links with valid destinations under your control.
+2. Replace the example GitHub links with the actual repository address only where appropriate.
+3. Make the `download.html` ZIP link point to a **real** published binary; do not leave `USBFixTool-1.0.0-win64.zip` as if it exists. **No release was produced by this documentation change.**
+4. Remove or verify size claims, version labels and advertised compatibility against the actual built artifact. HTML pages currently include version references that do not match the desktop's `APP_VERSION = "2.3.1"`.
+5. Remove or substantiate any testimonials, review counts, star ratings, performance or repair-success claims. The current homepage contains `aggregateRating` structured data with numeric values that **have not been validated** here. Do not publish unverified structured ratings.
+6. Replace commented analytics/advertising IDs or leave their scripts disabled, and comply with applicable consent and privacy requirements before enabling tracking.
+7. Audit every blog claim and external affiliate link for accuracy, sponsorship disclosures, and editorial quality.
+8. Review `sitemap.xml`, `robots.txt`, metadata, hosting paths and links with the final domain.
+9. Make sure user-facing safety warnings match the actual application's behavior. Disk formatting and repartitioning can permanently erase data.
 
-### Vercel
+A build ZIP, verified SHA-256 checksum, published distribution URL and external service availability are **not established** by these files.
 
-```bash
-npm i -g vercel
-cd website
-vercel
-```
+## Desktop application
 
-### GitHub Pages
-
-1. Push the `website/` folder to a repo branch (e.g. `gh-pages`).
-2. Enable GitHub Pages in the repo settings, pointing at that branch.
-
-### Cloudflare Pages
-
-1. Push to GitHub.
-2. Connect the repo on Cloudflare Pages with build command empty and
-   output directory set to `website`.
-
-## Plug in your real links
-
-Open the HTML files and replace these placeholders with your own:
-
-| Placeholder | What it is |
-| --- | --- |
-| `https://example.com/` | Canonical URLs in `<link rel="canonical">` and `og:url` |
-| `https://example.com/recover?ref=usbfixtool` | Affiliate URL on every CTA |
-| `https://example.com/downloads/USBFixTool-1.0.0-win64.zip` | Direct download link on `download.html` |
-| `ca-pub-XXXXXXXXXX` | Google AdSense publisher ID (commented block in `<head>`) |
-| `G-XXXXXXX` | Google Analytics 4 measurement ID |
-
-Use a global find-and-replace in your editor — every placeholder is
-unique enough to be safe.
-
-### Affiliate notes
-
-The `<a>` tags use `rel="nofollow sponsored noopener"` already, which
-matches Google's recommendation for affiliate links. No changes needed
-when you swap the URL.
-
-### AdSense slots
-
-Each page has an `<div class="ad-slot">` placeholder where a 728×90
-banner can live. Replace with your AdSense unit's `<ins>` tag once
-your account is approved.
+The actual USB repair application lives in [`../desktop/`](../desktop/README.md). See the repository [Safety guide](../../docs/SAFETY.md) before recommending destructive repair procedures.
