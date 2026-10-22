@@ -232,7 +232,12 @@ class CapacityTab(QWidget):
         srow.setSpacing(6)
         srow.addSpacing(24)
         self.size_spin = QSpinBox()
+        self.size_spin.setObjectName("capacitySizeSpin")
         self.size_spin.setRange(1, 1024 * 1024)
+        self.size_spin.setAlignment(Qt.AlignmentFlag.AlignLeft |
+                                    Qt.AlignmentFlag.AlignVCenter)
+        self.size_spin.setMinimumWidth(140)
+        self.size_spin.setFixedHeight(34)
         self.size_spin.setValue(1)
         self.size_spin.setEnabled(False)
         srow.addWidget(self.size_spin)

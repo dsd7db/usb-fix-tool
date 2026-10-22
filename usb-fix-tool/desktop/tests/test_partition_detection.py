@@ -214,6 +214,18 @@ def selected_rows():
 
 def check():
     assert "KINGSTON" in cap.drive_combo.currentText()
+    # Capacity Test: size editor should remain legible and correctly framed.
+    # Confirm geometry and value editing without starting any disk writes.
+    spin = cap.size_spin
+    assert spin.objectName() == "capacitySizeSpin"
+    assert spin.height() >= 34 and spin.minimumWidth() >= 140
+    assert spin.alignment() & Qt.AlignmentFlag.AlignVCenter
+    assert "QSpinBox#capacitySizeSpin" in win.styleSheet()
+    cap.rb_custom.setChecked(True)
+    spin.setValue(256)
+    assert spin.isEnabled() and spin.text() == "256"
+    cap.rb_full.setChecked(True)
+    assert not spin.isEnabled()
     assert rep.table.item(0, 1).text() == "KINGSTON"
     assert part.disk_combo.count() == 1
     assert "Kingston DataTraveler 3.0" in part.disk_combo.currentText()
