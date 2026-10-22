@@ -20,9 +20,9 @@ Follow [Development and build guide](docs/DEVELOPMENT.md). The desktop project l
 4. Record **which tests were actually run**, on which environment, and their observed outcomes. Do not claim tests passed without executing them.
 5. Update documentation for changed options, commands or safety behavior.
 6. Avoid embedding personal information, USB serials, filesystem contents, secrets, binaries or unverifiable claims.
-7. Do not introduce a copyright or license declaration on behalf of the maintainer.
+7. Preserve the project's existing copyright and MIT license notices; do not claim ownership of third-party material or introduce conflicting licenses.
 
-The repository currently has **no declared source license**. Being publicly readable does not grant unrestricted permission to reuse or distribute its contents. Contact the repository maintainer regarding rights and contribution terms before submitting substantial contributions.
+The project is available under the [MIT License](LICENSE). Contribute only code, content and assets you have the right to license for inclusion in this project. Third-party dependencies and assets retain any applicable third-party license requirements.
 
 ## Reporting a bug
 

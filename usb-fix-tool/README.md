@@ -38,4 +38,4 @@ Browse to <http://localhost:8080>. **Do not publish as-is:** the current HTML in
 
 ## Licensing
 
-There is **no `LICENSE` file at repository root**. An older description of the project asserted an MIT license without a corresponding license file. That assertion has been removed; do not assume any redistribution permission until the maintainer supplies applicable licensing terms.
+The project's original source and documentation are licensed under the **[MIT License](../LICENSE)**. Copyright (c) 2026 dsd7db. Third-party components and incorporated assets may have separate licensing requirements.

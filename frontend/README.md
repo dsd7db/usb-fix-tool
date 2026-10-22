@@ -18,3 +18,7 @@ yarn test
 These commands correspond to scripts declared in `package.json`. `REACT_APP_BACKEND_URL` is read by `src/App.js`; without configuration the example API call may fail. No development server, tests or production build were run during the documentation update.
 
 See the [repository overview](../README.md) for the actual Windows desktop utility and its installation instructions.
+
+## License
+
+The repository includes the [MIT License](../LICENSE) for project-owned material. Dependencies and third-party scaffolding retain their own licensing conditions.

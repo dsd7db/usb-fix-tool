@@ -57,3 +57,7 @@ The `tests/` directory contains engine, partition, fake-capacity, reporting/gati
 ## Important implementation files
 
 `main.py` (entry), `capacity_tab.py` and `storage_test.py` (verification), `partition_tab.py` and `partition_utils.py` (USB disk management), `repair_tab.py` and `usb_utils.py` (general repair), `report.py` (HTML reports), `scan_worker.py` (background enumeration), and `build.spec` (packaging).
+
+## License
+
+The original USB Fix Tool project source is licensed under the **[MIT License](../../LICENSE)**. Dependencies and bundled third-party components retain their respective licenses.

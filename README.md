@@ -62,6 +62,7 @@ It is a **one-folder** PyInstaller build: retain the entire `USBFixTool` distrib
 usb-fix-tool/
 ├── README.md                      # Public project overview (this document)
 ├── CHANGELOG.md                   # Documented changes, without inferred history
+├── LICENSE                        # MIT License
 ├── CONTRIBUTING.md                # Contribution guidance
 ├── SECURITY.md                    # Security reporting guidance
 ├── docs/                          # User, developer and safety documentation
@@ -96,8 +97,10 @@ usb-fix-tool/
 
 Automated desktop test scripts are present in `usb-fix-tool/desktop/tests/`, including a `run_all.sh` runner. They cover parts of the verification engine, device eligibility, destructive-operation gating, report gating, and simulated UI flows. **No tests or physical-device validation were executed as part of this documentation update.** Read test output and verify real hardware behavior yourself before relying on the tool.
 
-The bundled static website contains **demo URLs, download placeholders and other marketing content that must be checked before publication**; it should not be treated as an operational download service. See the website README for a publication checklist.
+The static website currently links to the source and build instructions rather than a verified binary download. A public hosting domain, final editorial verification, and any future published binary must be checked separately. See the website README for the publication checklist.
 
 ## Licensing
 
-**No `LICENSE` file is currently included in this repository.** Public source visibility is not an explicit grant of a reuse, redistribution, or modification license. Do not assume a license until the maintainer provides one.
+USB Fix Tool is licensed under the **MIT License**. See [LICENSE](LICENSE) for the full permission notice and conditions, including preservation of the copyright and license text in copies or substantial portions.
+
+Copyright (c) 2026 dsd7db. The MIT License applies to the original project material for which the maintainer can grant rights; third-party dependencies, framework code, and incorporated assets remain subject to their own applicable licenses.

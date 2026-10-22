@@ -2,6 +2,12 @@
 
 This file tracks changes that can be established from the repository. It does not reconstruct a release history from version labels or undocumented claims.
 
+## Unreleased — MIT licensing (2026-10-22)
+
+- Added the standard MIT license text to `LICENSE` with copyright attribution to `dsd7db`.
+- Updated licensing notices in the root and component READMEs, contribution guidance, and static website.
+- No application code, application version, or release artifacts were changed.
+
 ## Unreleased — documentation update (2026-10-22)
 
 ### Documentation
