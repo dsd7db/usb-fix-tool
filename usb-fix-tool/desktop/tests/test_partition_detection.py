@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 
 sys.path.insert(0, "/app/usb-fix-tool/desktop")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -184,13 +185,19 @@ cap, part, rep = win.capacity_tab, win.partition_tab, win.repair_tab
 
 
 def wait_idle(then, t0=None):
-    t0 = t0 or time.time()
-    if not (cap.is_scanning() or part.is_busy() or rep.is_scanning()):
-        then()
-    elif time.time() - t0 > 8:
-        raise AssertionError("scan timeout")
-    else:
-        QTimer.singleShot(20, lambda: wait_idle(then, t0))
+    try:
+        t0 = t0 or time.time()
+        if not (cap.is_scanning() or part.is_busy() or rep.is_scanning()):
+            then()
+        elif time.time() - t0 > 8:
+            raise AssertionError("scan timeout")
+        else:
+            QTimer.singleShot(20, lambda: wait_idle(then, t0))
+    except Exception:
+        # Qt prints uncaught timer callback errors but may leave app.exec()
+        # running; fail the test immediately instead of a 90-second timeout.
+        traceback.print_exc()
+        app.exit(1)
 
 
 def click_cell(row, col, dx=0):
@@ -290,13 +297,20 @@ def check():
     assert sorted({i.row() for i in pt.selectedIndexes()}) == [0]
     assert len(pt.selectedIndexes()) == pt.columnCount()
     assert part.btn_delete.isEnabled()              # gating unchanged
-    # selected row: one continuous blue rectangle, full row height
+    # Selected row must have a blue background throughout its height.
+    # Qt's offscreen renderer may blend the QSS color (#1766c2) differently
+    # across native platforms; exact pixel RGB is not a stable contract.
     img = pt.viewport().grab().toImage()
     rr = pt.visualRect(pt.model().index(0, 0))
     x = pt.visualRect(pt.model().index(0, 3)).center().x()
     for y in (rr.top() + 1, rr.center().y(), rr.bottom() - 1):
-        assert img.pixelColor(x, y).name() == "#1766c2", (y, img.pixelColor(x, y).name())
-    assert img.pixelColor(x, rr.bottom() + 2).name() == "#ffffff"  # plain bg below
+        color = img.pixelColor(x, y)
+        assert (color.blue() >= 170
+                and color.blue() - color.red() >= 55
+                and color.blue() - color.green() >= 35), (y, color.name())
+    below = img.pixelColor(x, rr.bottom() + 2)
+    channels = (below.red(), below.green(), below.blue())
+    assert min(channels) >= 230 and max(channels) - min(channels) <= 25, below.name()
     win.grab().save("/tmp/partition_row_selected.png")
     print("10. Partition Layout: gray unselected, full-row blue selection, "
           "no auto-select — OK")
