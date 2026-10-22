@@ -1,0 +1,103 @@
+name: Desktop tests and Windows build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'usb-fix-tool/desktop/**'
+      - 'usb-fix-tool/website/**'
+      - '.github/workflows/desktop-ci.yml'
+  pull_request:
+    paths:
+      - 'usb-fix-tool/desktop/**'
+      - 'usb-fix-tool/website/**'
+      - '.github/workflows/desktop-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  desktop-tests:
+    name: Mocked desktop test suite (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: usb-fix-tool/desktop
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONPATH: ${{ github.workspace }}/usb-fix-tool/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python dependency
+        run: python -m pip install -r requirements.txt
+      - name: Run existing scripted suite (mocked device operations)
+        run: bash tests/run_all.sh
+
+  windows-build:
+    name: Build desktop executable (Windows; no release)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build one-folder Windows app
+        shell: pwsh
+        run: |
+          Set-Location usb-fix-tool/desktop
+          & .\build.bat
+          if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path dist/USBFixTool/USBFixTool.exe)) { throw "Expected USBFixTool.exe is missing" }
+          Write-Host "Build output exists; no release or downloadable artifact was published."
+
+  website-check:
+    name: Check static website links and placeholders
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate local HTML destinations and published placeholders
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          from urllib.parse import urlsplit, unquote
+
+          root = Path("usb-fix-tool/website")
+          failures = []
+          class LinkParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.urls = []
+              def handle_starttag(self, tag, attrs):
+                  d = dict(attrs)
+                  if tag in ("a", "link") and d.get("href"):
+                      self.urls.append(d["href"])
+                  if tag in ("img", "script") and d.get("src"):
+                      self.urls.append(d["src"])
+          pages = list(root.rglob("*.html"))
+          for p in pages:
+              content = p.read_text(encoding="utf-8")
+              for bad in ("example.com", "replace-me-after-build", "ratingCount", "ca-pub-XXXXXXXXXX", "USBFixTool-1.0.0-win64.zip"):
+                  if bad in content:
+                      failures.append(f"{p}: placeholder or unsupported claim: {bad}")
+              parser = LinkParser()
+              parser.feed(content)
+              for href in parser.urls:
+                  parts = urlsplit(href)
+                  if not href or href.startswith(("#", "mailto:", "tel:", "data:", "javascript:")) or parts.scheme or parts.netloc:
+                      continue
+                  dest = p.parent / unquote(parts.path)
+                  if not dest.exists():
+                      failures.append(f"{p}: missing local target {href}")
+          if failures:
+              raise SystemExit("\n".join(failures))
+          print(f"Checked {len(pages)} HTML pages; no missing local assets/links or listed placeholders.")
+          PY

@@ -15,6 +15,15 @@ This file tracks changes that can be established from the repository. It does no
 - **No release created.**
 - **No tests executed during this documentation-only change.**
 
+## Unreleased — website and CI preparation (2026-10-22)
+
+- Replaced invalid demo download URLs with source and build documentation links.
+- Removed example-domain affiliate links, placeholder ad content, unsupported public ratings and unverified build-size claims from the static website.
+- Updated website copy to distinguish source availability from a published executable, and added stronger data-loss guidance.
+- Set an intentionally empty sitemap until an authentic domain is chosen.
+- Added an automated desktop test and Windows build workflow; workflow execution results must be checked separately.
+- No desktop application code, version, license terms or release binaries were changed or published.
+
 ## Existing application version
 
 `usb-fix-tool/desktop/main.py` currently declares `APP_VERSION = "2.3.1"`.

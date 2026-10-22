@@ -46,3 +46,9 @@ A build ZIP, verified SHA-256 checksum, published distribution URL and external 
 ## Desktop application
 
 The actual USB repair application lives in [`../desktop/`](../desktop/README.md). See the repository [Safety guide](../../docs/SAFETY.md) before recommending destructive repair procedures.
+
+## Public-content cleanup (2026-10-22)
+
+The HTML was updated to remove unverified numerical ratings, sample download artifacts, placeholder affiliate CTAs, advertisement placeholders, and example-domain canonical URLs. The download page now links to the **actual source repository and build documentation**, not to an invented ZIP. It makes no claim that a tested binary has been published. The website is still a **static site in this repository**, not an actively deployed service.
+
+Before deploying: choose a real domain, populate its canonical and Open Graph absolute URLs, publish a valid sitemap with that domain, verify all technical and editorial claims, and add an authentic downloadable build plus checksum **only if one is actually produced and distributed**. The supplied `sitemap.xml` is deliberately empty until a canonical domain exists. Do not claim an open-source license unless the owner explicitly selects one and adds the corresponding license terms.
