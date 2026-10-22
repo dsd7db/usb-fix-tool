@@ -17,9 +17,9 @@ import traceback
 sys.path.insert(0, "/app/usb-fix-tool/desktop")
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QTimer, Qt
+from PySide6.QtCore import QPoint, QTimer, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QAbstractSpinBox, QApplication
 import main as appmain
 import partition_utils as pu
 import usb_utils
@@ -218,9 +218,15 @@ def check():
     # Confirm geometry and value editing without starting any disk writes.
     spin = cap.size_spin
     assert spin.objectName() == "capacitySizeSpin"
-    assert spin.height() >= 34 and spin.minimumWidth() >= 140
+    assert spin.size().width() == 140 and spin.size().height() == 30
     assert spin.alignment() & Qt.AlignmentFlag.AlignVCenter
+    assert spin.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
     assert "QSpinBox#capacitySizeSpin" in win.styleSheet()
+    # A style must not cause the edit box to paint over the help label.
+    QApplication.processEvents()
+    spin_bottom = spin.mapToGlobal(QPoint(0, spin.height())).y()
+    note_top = cap.size_note.mapToGlobal(QPoint(0, 0)).y()
+    assert note_top - spin_bottom >= 6, (spin_bottom, note_top)
     cap.rb_custom.setChecked(True)
     spin.setValue(256)
     assert spin.isEnabled() and spin.text() == "256"

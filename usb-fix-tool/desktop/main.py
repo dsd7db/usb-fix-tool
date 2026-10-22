@@ -329,14 +329,11 @@ class MainWindow(QMainWindow):
             selection-background-color: #1766c2;
             selection-color: #ffffff;
         }
-        /* Keep the Capacity Test size value clear of the stepper arrows.
-           The default spinbox padding can clip the text on Windows. */
+        /* Buttonless size entry avoids native Windows spin controls
+           drawing below their bounds. Value remains editable by typing
+           or keyboard Up/Down; the unit selector remains adjacent. */
         QSpinBox#capacitySizeSpin {
-            padding: 3px 28px 3px 10px;
-        }
-        QSpinBox#capacitySizeSpin::up-button,
-        QSpinBox#capacitySizeSpin::down-button {
-            width: 20px;
+            padding: 3px 10px;
         }
         QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
             border-color: #1766c2;

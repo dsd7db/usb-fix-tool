@@ -20,6 +20,7 @@ from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
+    QAbstractSpinBox,
     QButtonGroup,
     QComboBox,
     QFileDialog,
@@ -236,8 +237,11 @@ class CapacityTab(QWidget):
         self.size_spin.setRange(1, 1024 * 1024)
         self.size_spin.setAlignment(Qt.AlignmentFlag.AlignLeft |
                                     Qt.AlignmentFlag.AlignVCenter)
-        self.size_spin.setMinimumWidth(140)
-        self.size_spin.setFixedHeight(34)
+        # Suppress native steppers: with the shared QSS they extend over
+        # the help text on Windows. Keyboard Up/Down remains available.
+        self.size_spin.setButtonSymbols(
+            QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.size_spin.setFixedSize(140, 30)
         self.size_spin.setValue(1)
         self.size_spin.setEnabled(False)
         srow.addWidget(self.size_spin)
@@ -247,6 +251,7 @@ class CapacityTab(QWidget):
         srow.addWidget(self.unit_combo)
         srow.addStretch(1)
         lay.addLayout(srow)
+        lay.addSpacing(8)  # keep the numeric editor clear of the help text
         self.rb_custom.toggled.connect(
             lambda on: (self.size_spin.setEnabled(on),
                         self.unit_combo.setEnabled(on)))
@@ -256,6 +261,7 @@ class CapacityTab(QWidget):
                       "not modified.")
         note.setObjectName("noteText")
         note.setWordWrap(True)
+        self.size_note = note
         lay.addWidget(note)
         lay.addStretch(1)
         return frame
