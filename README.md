@@ -54,7 +54,11 @@ The script creates a virtual environment, installs dependencies and PyInstaller,
 usb-fix-tool\desktop\dist\USBFixTool\USBFixTool.exe
 ```
 
-It is a **one-folder** PyInstaller build: retain the entire `USBFixTool` distribution folder. Building is not a claim that a tested executable or downloadable release exists. See [Development and building](docs/DEVELOPMENT.md) for step-by-step instructions.
+It is a **one-folder** PyInstaller build: retain the entire `USBFixTool` distribution folder. Building is not a claim that a tested executable or published release exists. See [Development and building](docs/DEVELOPMENT.md) for step-by-step instructions.
+
+## Windows CI evaluation archive (not a Release)
+
+A passing GitHub Actions run on `main` can provide a temporary **`USBFixTool-windows-build`** artifact containing a versioned Windows ZIP and a corresponding SHA-256 checksum. The build is unsigned and has **not** been validated for destructive operations on real hardware. See [Windows install and checksum verification](docs/INSTALL_WINDOWS.md) and the [release-readiness checklist](docs/RELEASE_CHECKLIST.md).
 
 ## Repository layout
 
@@ -89,6 +93,8 @@ usb-fix-tool/
 - [User guide](docs/USER_GUIDE.md) — device selection, testing, reports and maintenance workflows
 - [Safety and data loss](docs/SAFETY.md) — destructive operations, identity checks and limitations
 - [Development and building](docs/DEVELOPMENT.md) — environment, executable build, tests and component layout
+- [Windows installation & SHA-256](docs/INSTALL_WINDOWS.md) — extract, verify and launch an evaluation artifact
+- [Release-readiness checklist](docs/RELEASE_CHECKLIST.md) — outstanding manual and legal checks before public distribution
 - [Desktop component details](usb-fix-tool/desktop/README.md)
 - [Static website setup and publication checklist](usb-fix-tool/website/README.md)
 - [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)

@@ -43,7 +43,8 @@ jobs:
         run: bash tests/run_all.sh
 
   windows-build:
-    name: Build desktop executable (Windows; no release)
+    name: Build and package Windows evaluation artifact (no release)
+    needs: [desktop-tests, website-check]
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -58,7 +59,47 @@ jobs:
           & .\build.bat
           if ($LASTEXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path dist/USBFixTool/USBFixTool.exe)) { throw "Expected USBFixTool.exe is missing" }
-          Write-Host "Build output exists; no release or downloadable artifact was published."
+          Write-Host "Built Windows executable; packaging into CI evaluation artifact next."
+      - name: Package Windows build with MIT license, instructions and SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Set-Location usb-fix-tool/desktop
+          $source = Get-Content -LiteralPath main.py -Raw
+          if ($source -notmatch '(?m)^APP_VERSION\s*=\s*"(?<version>[0-9]+\.[0-9]+\.[0-9]+)"') {
+            throw 'Unable to read the application version from main.py'
+          }
+          $version = $Matches['version']
+          $dist = 'dist/USBFixTool'
+          if (-not (Test-Path "$dist/USBFixTool.exe")) { throw 'Built executable not found' }
+          Copy-Item -LiteralPath '../../LICENSE' -Destination "$dist/LICENSE" -ErrorAction Stop
+          Copy-Item -LiteralPath '../../docs/INSTALL_WINDOWS.md' -Destination "$dist/README-INSTALL.md" -ErrorAction Stop
+          @(
+            "USB Fix Tool — evaluation build"
+            "Source version: $version"
+            "Git commit: $env:GITHUB_SHA"
+            "Actions run ID: $env:GITHUB_RUN_ID"
+            "This is an unsigned CI artifact, not a published release or a hardware safety certification."
+          ) | Set-Content -LiteralPath "$dist/BUILD_INFO.txt" -Encoding utf8
+          New-Item -ItemType Directory -Path 'package' -Force | Out-Null
+          $filename = "USBFixTool-$version-win64.zip"
+          $zip = "package/$filename"
+          Compress-Archive -Path $dist -DestinationPath $zip -CompressionLevel Optimal -Force
+          if (-not (Test-Path $zip)) { throw 'Archive missing after packaging' }
+          $archiveHash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$archiveHash  $filename" | Set-Content -LiteralPath "$zip.sha256" -Encoding ascii
+          if ((Get-Item -LiteralPath $zip).Length -le 0) { throw 'Archive is empty' }
+          Write-Host "Created $filename (SHA-256: $archiveHash)"
+          Write-Host 'CI artifact for evaluation only; no GitHub Release was created.'
+      - name: Upload ZIP and checksum as a temporary GitHub Actions artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: USBFixTool-windows-build
+          path: usb-fix-tool/desktop/package/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
 
   website-check:
     name: Check static website links and placeholders

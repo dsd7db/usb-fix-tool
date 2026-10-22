@@ -2,6 +2,14 @@
 
 This file tracks changes that can be established from the repository. It does not reconstruct a release history from version labels or undocumented claims.
 
+## Unreleased — Windows CI packaging (2026-10-22)
+
+- Configured the Windows CI job to run only after mock tests and website checks succeed.
+- Added an evaluation ZIP packaging stage, version read from desktop source, SHA-256 checksum, MIT license, installation guide and build provenance.
+- Added a temporary (14-day) GitHub Actions artifact upload. This is **not** a GitHub Release.
+- Added explicit Windows installation, checksum verification and pre-release safety/licensing checklists.
+- No application logic or version was changed; artifact success must be checked in a subsequent CI run.
+
 ## Unreleased — MIT licensing (2026-10-22)
 
 - Added the standard MIT license text to `LICENSE` with copyright attribution to `dsd7db`.

@@ -41,7 +41,7 @@ The checked-in pages include development placeholders and marketing text that mu
 8. Review `sitemap.xml`, `robots.txt`, metadata, hosting paths and links with the final domain.
 9. Make sure user-facing safety warnings match the actual application's behavior. Disk formatting and repartitioning can permanently erase data.
 
-A build ZIP, verified SHA-256 checksum, published distribution URL and external service availability are **not established** by these files.
+This website still does **not** advertise a published binary or installer. The separate GitHub Actions workflow can generate a temporary **evaluation** ZIP and SHA-256 checksum after successful checks; availability is per-run, time-limited and not equivalent to a reviewed GitHub Release. See [Windows installation and integrity verification](../../docs/INSTALL_WINDOWS.md) and the [release-readiness checklist](../../docs/RELEASE_CHECKLIST.md).
 
 ## Desktop application
 

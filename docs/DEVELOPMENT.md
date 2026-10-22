@@ -48,7 +48,13 @@ The command above assumes you are in the *parent directory containing the clone*
 
 The spec configures a **one-folder** GUI distribution, embeds application assets, requests UAC elevation (`uac_admin=True`) and disables UPX. Expected successful output: `dist\USBFixTool\USBFixTool.exe`. Copy the entire `dist\USBFixTool\` directory to distribute the build; **do not ship the executable alone**.
 
-This documentation update has **not** compiled the executable, measured its size, produced a checksum, signed it, or verified antivirus behavior.
+The Windows GitHub Actions build has produced `USBFixTool.exe` successfully in CI (see [Actions](https://github.com/dsd7db/usb-fix-tool/actions)). A successful compile does **not** mean the resulting application has been tested against real USB devices, code-signed or verified by antivirus vendors. See [Windows installation and integrity verification](INSTALL_WINDOWS.md) for the evaluation ZIP and SHA-256 workflow.
+
+## CI evaluation artifact
+
+The GitHub Actions workflow waits for Linux mock tests and website checks to succeed before building the Windows evaluation candidate. The Windows job creates a `USBFixTool-<version>-win64.zip` archive from the one-folder `dist/USBFixTool/`, adds the project `LICENSE`, Windows installation instructions and `BUILD_INFO.txt`, and generates a `*.zip.sha256` file. It uploads both files as a temporary Actions artifact named `USBFixTool-windows-build` (14-day retention). It does **not** create a GitHub Release, digitally sign the EXE or prove hardware compatibility.
+
+For reproducibility, the archive records the Git commit and GitHub run ID. Dependencies are not fully pinned, so rebuilding at a later time can result in different binary bytes.
 
 ## Source organization
 
