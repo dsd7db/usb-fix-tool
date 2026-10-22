@@ -17,10 +17,9 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QIntValidator
 from PySide6.QtWidgets import (
     QApplication,
-    QAbstractSpinBox,
     QButtonGroup,
     QComboBox,
     QFileDialog,
@@ -28,12 +27,12 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
     QSizePolicy,
-    QSpinBox,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -212,7 +211,7 @@ class CapacityTab(QWidget):
 
     def _build_mode_panel(self) -> QWidget:
         frame, lay = self._panel("TEST MODE")
-        frame.setMinimumHeight(185)
+        frame.setMinimumHeight(250)
 
         self.mode_group = QButtonGroup(self)
         self.rb_full = QRadioButton("Full capacity test")
@@ -232,19 +231,18 @@ class CapacityTab(QWidget):
         srow = QHBoxLayout()
         srow.setSpacing(6)
         srow.addSpacing(24)
-        self.size_spin = QSpinBox()
-        self.size_spin.setObjectName("capacitySizeSpin")
-        self.size_spin.setRange(1, 1024 * 1024)
-        self.size_spin.setAlignment(Qt.AlignmentFlag.AlignLeft |
-                                    Qt.AlignmentFlag.AlignVCenter)
-        # Suppress native steppers: with the shared QSS they extend over
-        # the help text on Windows. Keyboard Up/Down remains available.
-        self.size_spin.setButtonSymbols(
-            QAbstractSpinBox.ButtonSymbols.NoButtons)
-        self.size_spin.setFixedSize(140, 30)
-        self.size_spin.setValue(1)
-        self.size_spin.setEnabled(False)
-        srow.addWidget(self.size_spin)
+        # Use a plain numeric text field to avoid native QSpinBox stepper
+        # rendering/clipping problems in styled Qt on Windows.
+        self.size_input = QLineEdit()
+        self.size_input.setObjectName("capacitySizeInput")
+        self.size_input.setValidator(QIntValidator(1, 1024 * 1024,
+                                                 self.size_input))
+        self.size_input.setAlignment(Qt.AlignmentFlag.AlignLeft |
+                                     Qt.AlignmentFlag.AlignVCenter)
+        self.size_input.setFixedSize(140, 30)
+        self.size_input.setText("1")
+        self.size_input.setEnabled(False)
+        srow.addWidget(self.size_input)
         self.unit_combo = QComboBox()
         self.unit_combo.addItems(["GB", "MB"])
         self.unit_combo.setEnabled(False)
@@ -253,7 +251,7 @@ class CapacityTab(QWidget):
         lay.addLayout(srow)
         lay.addSpacing(8)  # keep the numeric editor clear of the help text
         self.rb_custom.toggled.connect(
-            lambda on: (self.size_spin.setEnabled(on),
+            lambda on: (self.size_input.setEnabled(on),
                         self.unit_combo.setEnabled(on)))
 
         note = QLabel("Test data is written to free space only and "
@@ -603,8 +601,19 @@ class CapacityTab(QWidget):
             return avail
         if self.rb_quick.isChecked():
             return min(GiB, avail)
+        entered = self.size_input.text().strip()
+        try:
+            size = int(entered)
+        except ValueError:
+            size = 0
+        if not (1 <= size <= 1024 * 1024):
+            QMessageBox.warning(
+                self, "Invalid test size",
+                "Enter a whole number between 1 and 1048576 "
+                "before starting the test.")
+            return None
         unit = GiB if self.unit_combo.currentText() == "GB" else MiB
-        want = self.size_spin.value() * unit
+        want = size * unit
         if want > avail:
             QMessageBox.warning(
                 self, "Size too large",
@@ -1185,7 +1194,7 @@ class CapacityTab(QWidget):
         for w in (self.rb_full, self.rb_custom, self.rb_quick):
             w.setEnabled(not running)
         custom = self.rb_custom.isChecked() and not running
-        self.size_spin.setEnabled(custom)
+        self.size_input.setEnabled(custom)
         self.unit_combo.setEnabled(custom)
         if running:
             self.hint_label.setText("Test in progress — keep the "

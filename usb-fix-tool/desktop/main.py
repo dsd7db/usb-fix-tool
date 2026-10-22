@@ -329,10 +329,9 @@ class MainWindow(QMainWindow):
             selection-background-color: #1766c2;
             selection-color: #ffffff;
         }
-        /* Buttonless size entry avoids native Windows spin controls
-           drawing below their bounds. Value remains editable by typing
-           or keyboard Up/Down; the unit selector remains adjacent. */
-        QSpinBox#capacitySizeSpin {
+        /* Plain editable numeric field in Capacity Test.
+           QIntValidator restricts values; native spin arrows are omitted. */
+        QLineEdit#capacitySizeInput {
             padding: 3px 10px;
         }
         QLineEdit:focus, QComboBox:focus, QSpinBox:focus {

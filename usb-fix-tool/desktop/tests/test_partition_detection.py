@@ -19,7 +19,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QPoint, QTimer, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QAbstractSpinBox, QApplication
+from PySide6.QtWidgets import QApplication, QLineEdit
 import main as appmain
 import partition_utils as pu
 import usb_utils
@@ -216,22 +216,33 @@ def check():
     assert "KINGSTON" in cap.drive_combo.currentText()
     # Capacity Test: size editor should remain legible and correctly framed.
     # Confirm geometry and value editing without starting any disk writes.
-    spin = cap.size_spin
-    assert spin.objectName() == "capacitySizeSpin"
-    assert spin.size().width() == 140 and spin.size().height() == 30
-    assert spin.alignment() & Qt.AlignmentFlag.AlignVCenter
-    assert spin.buttonSymbols() == QAbstractSpinBox.ButtonSymbols.NoButtons
-    assert "QSpinBox#capacitySizeSpin" in win.styleSheet()
-    # A style must not cause the edit box to paint over the help label.
-    QApplication.processEvents()
-    spin_bottom = spin.mapToGlobal(QPoint(0, spin.height())).y()
-    note_top = cap.size_note.mapToGlobal(QPoint(0, 0)).y()
-    assert note_top - spin_bottom >= 6, (spin_bottom, note_top)
+    entry = cap.size_input
+    assert isinstance(entry, QLineEdit)
+    assert entry.objectName() == "capacitySizeInput"
+    assert entry.size().width() == 140 and entry.size().height() == 30
+    assert entry.alignment() & Qt.AlignmentFlag.AlignVCenter
+    assert "QLineEdit#capacitySizeInput" in win.styleSheet()
     cap.rb_custom.setChecked(True)
-    spin.setValue(256)
-    assert spin.isEnabled() and spin.text() == "256"
+    QApplication.processEvents()
+    assert entry.isEnabled() and not entry.isReadOnly()
+    entry.setFocus()
+    entry.selectAll()
+    QTest.keyClicks(entry, "256")
+    QApplication.processEvents()
+    assert entry.text() == "256", entry.text()
+    # Invalid input is rejected; no disk writes are performed.
+    entry.selectAll()
+    QTest.keyClicks(entry, "abc")
+    assert entry.text() != "abc", entry.text()
+    entry.selectAll()
+    QTest.keyClicks(entry, "64")
+    assert entry.text() == "64"
+    # The widget and its help text must occupy non-overlapping rectangles.
+    entry_bottom = entry.mapToGlobal(QPoint(0, entry.height())).y()
+    note_top = cap.size_note.mapToGlobal(QPoint(0, 0)).y()
+    assert note_top - entry_bottom >= 6, (entry_bottom, note_top)
     cap.rb_full.setChecked(True)
-    assert not spin.isEnabled()
+    assert not entry.isEnabled()
     assert rep.table.item(0, 1).text() == "KINGSTON"
     assert part.disk_combo.count() == 1
     assert "Kingston DataTraveler 3.0" in part.disk_combo.currentText()
